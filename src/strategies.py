@@ -1,58 +1,28 @@
+"""
+脚質ごとの計算ロジックをカプセル化します
+"""
 from __future__ import annotations
-from abc import ABC, abstractmethod
+import random
+from typing import Protocol, TYPE_CHECKING
 
-class Strategy(ABC):
-    """脚質戦略の抽象基底クラス"""
+if TYPE_CHECKING:
+    from .models import Horse, Jockey
 
-    @abstractmethod
-    def calculate_step(self, current_dist: float, total_dist: float, base_speed: float) -> float:
-        """
-        現在の走行距離に基づき、目標速度を算出する。
-        """
-        pass
+class MoveStrategy(Protocol):
+    """移動戦略のインターフェース規約"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int: ...
 
-    @property
-    @abstractmethod
-    def spurt_multiplier(self) -> float:
-        """スパート時の速度倍率"""
-        pass
+class RunawayStrategy:
+    """【逃げ】常に安定して前を走る戦略"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int:
+        effective_speed = int(horse.speed * jockey.front_skill)
+        return random.randint(int(effective_speed * 0.8), effective_speed)
 
-class RunawayStrategy(Strategy):
-    """逃げ: 序盤から飛ばしてリードを作る"""
-    def calculate_step(self, current_dist: float, total_dist: float, base_speed: float) -> float:
-        return base_speed * 1.10
-
-    @property
-    def spurt_multiplier(self) -> float:
-        return 1.02
-
-class LeadingStrategy(Strategy):
-    """先行: 前方で安定して走行する"""
-    def calculate_step(self, current_dist: float, total_dist: float, base_speed: float) -> float:
-        return base_speed * 1.05
-
-    @property
-    def spurt_multiplier(self) -> float:
-        return 1.05
-
-class MidPackStrategy(Strategy):
-    """差し: 中盤まで抑え、終盤に加速の準備をする"""
-    def calculate_step(self, current_dist: float, total_dist: float, base_speed: float) -> float:
-        if current_dist < total_dist * 0.6:
-            return base_speed * 0.95
-        return base_speed * 1.0
-
-    @property
-    def spurt_multiplier(self) -> float:
-        return 1.12
-
-class ChaserStrategy(Strategy):
-    """追込: 後方で待機し、最後の一瞬にかける"""
-    def calculate_step(self, current_dist: float, total_dist: float, base_speed: float) -> float:
-        if current_dist < total_dist * 0.7:
-            return base_speed * 0.90
-        return base_speed * 0.95
-
-    @property
-    def spurt_multiplier(self) -> float:
-        return 1.20
+class ChaserStrategy:
+    """【追い込み】終盤に爆発力を発揮する戦略"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int:
+        effective_speed = int(horse.speed * jockey.back_skill)
+        if horse.position < (course_length / 2):
+            return random.randint(1, int(effective_speed * 0.5))
+        else:
+            return random.randint(effective_speed, int(effective_speed * 1.5))

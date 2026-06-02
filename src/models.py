@@ -1,40 +1,33 @@
+"""
+データクラスのみを定義する安定した土台です。
+"""
+
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-@dataclass(frozen=True)
+if TYPE_CHECKING:
+    from .strategies import MoveStrategy
+
+@dataclass
 class Jockey:
-    """騎手データクラス"""
+    """騎手の能力値を保持するデータクラス"""
     name: str
-    skill: float  # 0.0 ~ 1.0 (スタミナ効率に影響)
-
-    def __post_init__(self):
-        if not (0.0 <= self.skill <= 1.0):
-            raise ValueError("Jockey skill must be between 0.0 and 1.0")
+    front_skill: float
+    back_skill: float
 
 @dataclass
 class Horse:
-    """馬データクラス"""
+    """馬の属性と状態を管理するドメインモデル"""
     name: str
-    max_speed: float  # 基本最高速度 (m/s)
-    stamina: float    # 総スタミナ量
+    speed: int
+    stamina: int
+    strategy: MoveStrategy
     jockey: Jockey
+    position: int = 0
 
-@dataclass(frozen=True)
+@dataclass
 class RaceConfig:
-    """レース設定クラス"""
-    distance: float = 1600.0
-    weather: str = "Sunny"
-
-    def __post_init__(self):
-        if self.distance <= 0:
-            raise ValueError("Race distance must be positive")
-
-@dataclass(frozen=True)
-class RaceState:
-    """ステップごとの状態を通知するためのDTO"""
-    name: str
-    distance: float
-    speed: float
-    stamina: float
-    is_finished: bool
-    rank_order: int = 0
+    """レースの環境設定"""
+    course_length: int = 100
+    interval: float = 0.5
