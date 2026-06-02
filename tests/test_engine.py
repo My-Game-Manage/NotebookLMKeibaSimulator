@@ -10,7 +10,7 @@ from src.strategies import RunawayStrategy
 def test_engine_step_advances_horse():
     jockey = Jockey("テスト", 1.0, 1.0)
     horse = Horse("馬", 10, 100, RunawayStrategy(), jockey)
-    engine = SimulationEngine(100, [horse])
+    engine = SimulationEngine(100, [horse], 0.1)
     
     initial_pos = horse.position
     engine.step()
@@ -19,7 +19,7 @@ def test_engine_step_advances_horse():
 def test_engine_winner_detection():
     jockey = Jockey("テスト", 1.0, 1.0)
     horse = Horse("馬", 10, 100, RunawayStrategy(), jockey)
-    engine = SimulationEngine(100, [horse])
+    engine = SimulationEngine(100, [horse], 0.1)
     
     horse.position = 99
     winner = engine.step()

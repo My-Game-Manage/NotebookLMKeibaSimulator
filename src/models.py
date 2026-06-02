@@ -1,5 +1,7 @@
 """
 データクラスのみを定義する安定した土台です。
+
+- レース設定に論理的な時間単位（tick_time）を追加し、距離を float で扱えるようにします
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ class Horse:
 
 @dataclass
 class RaceConfig:
-    """レースの環境設定"""
-    course_length: int = 100
-    interval: float = 0.5
+    """1600mレースと秒単位計算に対応した設定"""
+    course_length: int = 1600  # 100mから1600mへ拡張 [3]
+    tick_time: float = 0.1     # 1ステップあたりの論理時間（秒）
+    interval: float = 0.01     # 実際の表示更新間隔（秒）

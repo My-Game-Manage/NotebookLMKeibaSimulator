@@ -20,5 +20,5 @@ def test_horse_creation():
 
 def test_race_config_defaults():
     config = RaceConfig()
-    assert config.course_length == 100
-    assert config.interval == 0.5
+    assert config.course_length == 1600
+    assert config.interval == 0.01

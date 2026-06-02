@@ -9,7 +9,7 @@ from src.view import ConsoleView
 
 def main():
     # 1. コンフィグ設定
-    config = RaceConfig(course_length=100, interval=0.5)
+    config = RaceConfig(course_length=1600, interval=0.01, tick_time=0.1)
     
     # 2. 騎手と馬の生成
     j1 = Jockey("武豊", 1.2, 1.0)
