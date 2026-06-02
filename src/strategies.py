@@ -3,11 +3,12 @@
 """
 from __future__ import annotations
 import random
-from typing import Protocol, TYPE_CHECKING
+from typing import Protocol, TYPE_CHECKING, runtime_checkable
 
 if TYPE_CHECKING:
     from .models import Horse, Jockey
 
+@runtime_checkable
 class MoveStrategy(Protocol):
     """移動戦略のインターフェース規約"""
     def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int: ...

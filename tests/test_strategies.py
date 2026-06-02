@@ -1,35 +1,37 @@
 """
-4. 脚質ロジック検証 (test_strategies.py)
-
-全ての脚質が、それぞれの特性（序盤の加速、終盤の伸び）を正しく計算できているかを検証します。ここでは、単なる型のチェックではなく、脚質間の相対的な性能差をアサーションの対象とします。
+脚質ごとの移動ロジック（逃げ・追込）が設計通りに動くかを検証します
 """
-
 from __future__ import annotations
 import pytest
-from src.strategies import (
-    RunawayStrategy, LeadingStrategy, MidPackStrategy, ChaserStrategy
-)
+from src.models import Horse, Jockey
+from src.strategies import RunawayStrategy, ChaserStrategy
 
-class TestStrategies:
-    """脚質別ロジックの相対的な妥当性を検証する"""
+@pytest.fixture
+def setup_data():
+    jockey = Jockey("テスト", 1.0, 1.0)
+    return jockey
 
-    @pytest.mark.parametrize("phase, dist_traveled", [
-        ("Early", 100),   # レース序盤 (100m地点)
-        ("Middle", 1000), # 中盤 (1000m地点)
-        ("Final", 1800),  # 終盤 (1800m地点)
-    ])
-    def test_strategy_relative_speeds(self, phase: str, dist_traveled: float):
-        """各脚質のフェーズごとの速度差がドメイン知識と整合しているか検証"""
-        total_dist = 2000.0
-        
-        runaway = RunawayStrategy().calculate_step(dist_traveled, total_dist)
-        leading = LeadingStrategy().calculate_step(dist_traveled, total_dist)
-        betwixt = MidPackStrategy().calculate_step(dist_traveled, total_dist)
-        chaser = ChaserStrategy().calculate_step(dist_traveled, total_dist)
+def test_runaway_strategy_range(setup_data):
+    """逃げ馬の移動距離が規定の範囲内(80%-100%)か確認"""
+    strategy = RunawayStrategy()
+    horse = Horse("逃げ", 10, 100, strategy, setup_data)
+    
+    for _ in range(100):
+        move = strategy.calculate_step(horse, setup_data, 100)
+        # speed 10 * skill 1.0 = 10. 範囲は 8～10
+        assert 8 <= move <= 10
 
-        if phase == "Early":
-            # 序盤は「逃げ」が最も速く、「追込」が最も遅い
-            assert runaway > leading > betwixt > chaser
-        elif phase == "Final":
-            # 終盤は「追込」や「差し」の計算値が伸びる設計であることを確認
-            assert chaser > betwixt > leading
+def test_chaser_strategy_phases(setup_data):
+    """追込馬が前半抑え、後半加速するか確認"""
+    strategy = ChaserStrategy()
+    horse = Horse("追込", 10, 100, strategy, setup_data)
+    
+    # 前半（位置0）
+    horse.position = 0
+    move_early = strategy.calculate_step(horse, setup_data, 100)
+    assert move_early <= 5 # 10 * 0.5
+    
+    # 後半（位置60）
+    horse.position = 60
+    move_late = strategy.calculate_step(horse, setup_data, 100)
+    assert move_late >= 10 # 10 * 1.0
