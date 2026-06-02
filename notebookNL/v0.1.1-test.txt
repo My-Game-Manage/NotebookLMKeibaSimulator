@@ -1,0 +1,198 @@
+競馬シミュレータ v0.1.1 ロジック検証用テストコードレポート
+
+1. レポートの目的と検証範囲
+
+本レポートは、競馬シミュレータ v0.1.1 における主要な走行ロジックおよび物理演算エンジンの妥当性を検証するためのテスト設計を提示するものです。特に、各脚質に応じた移動距離計算の差異、スタミナ消費メカニズム、および終盤のスパート挙動が、シミュレーションとして矛盾なく動作することを保証することを目的としています。
+
+検証対象コンポーネント
+
+* models.py: 競走馬、騎手、レース設定のデータ整合性
+* strategies.py: 4つの脚質（逃げ・先行・差し・追込）に基づく計算アルゴリズム
+* engine.py: 状態更新（スタミナ減少・速度計算・スパート判定）の物理計算コア
+* race.py: レース進行管理とオブザーバー通知の統合テスト
+
+2. 開発・実行環境仕様
+
+本プロジェクトは、安定性と互換性を重視し、以下の仕様に厳密に準拠します。Python 3.11 以降の新機能（Self 型や ExceptionGroup 等）を排除し、指定のランタイム環境での動作を保証します。
+
+項目	仕様	備考
+言語	Python 3.10.12	
+テストフレームワーク	pytest	7.x 系統を推奨
+基本構文	from __future__ import annotations	型ヒントの遅延評価を有効化
+型定義	文字列リテラルによる前方参照	Python 3.10 互換性の維持
+実行環境	Jupyter / VSCode	マルチファイル構成でのインポートに対応
+
+3. テストファイル構成と役割
+
+テストコードは、機能ごとのモジュール性を確保するため、以下の構造で配置します。
+
+project_root/
+│
+├── src/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── models.py
+│   ├── strategies.py
+│   ├── engine.py
+│   ├── interfaces.py
+│   ├── race.py
+│   └── views.py
+│
+└── tests/
+    ├── __init__.py
+    ├── conftest.py        # 共通フィクスチャ定義
+    ├── test_strategies.py # 脚質ロジック検証
+    └── test_engine.py     # エンジン・物理演算検証
+
+
+テストファイル対応表
+
+テストファイル名	対応モジュール	主要な検証クラス / 関数	検証内容の概要
+test_strategies.py	strategies.py	RunawayStrategy, LeadingStrategy, BetwixtStrategy, ChaserStrategy	脚質ごとの加速度・最高速度の相対的比較検証
+test_engine.py	engine.py	SimulationEngine	スタミナ減少率、スパート発動条件（距離・スタミナ）、減速挙動
+conftest.py	models.py	Horse, Jockey, RaceConfig	テストデータの標準化とモック提供
+
+4. 脚質ロジック検証 (test_strategies.py)
+
+全ての脚質が、それぞれの特性（序盤の加速、終盤の伸び）を正しく計算できているかを検証します。ここでは、単なる型のチェックではなく、脚質間の相対的な性能差をアサーションの対象とします。
+
+from __future__ import annotations
+import pytest
+from src.strategies import (
+    RunawayStrategy, LeadingStrategy, BetwixtStrategy, ChaserStrategy
+)
+
+class TestStrategies:
+    """脚質別ロジックの相対的な妥当性を検証する"""
+
+    @pytest.mark.parametrize("phase, dist_traveled", [
+        ("Early", 100),   # レース序盤 (100m地点)
+        ("Middle", 1000), # 中盤 (1000m地点)
+        ("Final", 1800),  # 終盤 (1800m地点)
+    ])
+    def test_strategy_relative_speeds(self, phase: str, dist_traveled: float):
+        """各脚質のフェーズごとの速度差がドメイン知識と整合しているか検証"""
+        total_dist = 2000.0
+        
+        runaway = RunawayStrategy().calculate_step(dist_traveled, total_dist)
+        leading = LeadingStrategy().calculate_step(dist_traveled, total_dist)
+        betwixt = BetwixtStrategy().calculate_step(dist_traveled, total_dist)
+        chaser = ChaserStrategy().calculate_step(dist_traveled, total_dist)
+
+        if phase == "Early":
+            # 序盤は「逃げ」が最も速く、「追込」が最も遅い
+            assert runaway > leading > betwixt > chaser
+        elif phase == "Final":
+            # 終盤は「追込」や「差し」の計算値が伸びる設計であることを確認
+            assert chaser > betwixt > leading
+
+
+5. スタミナ消費およびスパート機能検証 (test_engine.py)
+
+SimulationEngine の物理計算を検証します。現時点（v0.1.1）では step メソッドの実装が進行中であるため、本テストは TDD（テスト駆動開発）における Red 状態として機能します。
+
+from __future__ import annotations
+import pytest
+from src.engine import SimulationEngine
+from src.models import Horse, RaceConfig
+
+class TestSimulationEngine:
+    """
+    エンジンの物理更新ロジックを検証する。
+    注意: stepメソッドが未実装（空）の場合、これらのテストは失敗することが期待されます。
+    """
+
+    def test_stamina_depletion(self, runaway_horse, standard_race_config):
+        """ステップごとにスタミナが確実に減少することを検証"""
+        engine = SimulationEngine(standard_race_config)
+        initial_stamina = runaway_horse.stamina
+        
+        engine.step(runaway_horse)
+        
+        # スタミナが正の消費量を持つことを確認
+        assert runaway_horse.stamina < initial_stamina
+
+    def test_spurt_trigger_logic(self, runaway_horse, standard_race_config):
+        """残り距離が20%以下になった際、スパート状態へ移行することを検証"""
+        engine = SimulationEngine(standard_race_config)
+        
+        # レース終盤（残り10%）の状態をセット
+        runaway_horse.current_position = standard_race_config.distance * 0.9
+        
+        engine.step(runaway_horse)
+        
+        # スパートフラグがTrueになること
+        assert runaway_horse.is_spurting is True
+
+    def test_exhaustion_behavior(self, runaway_horse, standard_race_config):
+        """スタミナが0になった際、速度が大幅に制限されることを検証"""
+        engine = SimulationEngine(standard_race_config)
+        runaway_horse.stamina = 0
+        original_speed = runaway_horse.current_speed
+        
+        engine.step(runaway_horse)
+        
+        # スタミナ切れ後の速度は、元の速度の一定割合（例: 50%以下）に制限される
+        assert runaway_horse.current_speed < (original_speed * 0.6)
+
+
+6. テスト用モックとフィクスチャの設定 (conftest.py)
+
+テストの再現性を担保するため、共通のフィクスチャを定義します。脚質名ではなく、実際の戦略クラスをインスタンス化して Horse に渡すことで、型安全なテストを実現します。
+
+from __future__ import annotations
+import pytest
+from src.models import Horse, Jockey, RaceConfig
+from src.strategies import RunawayStrategy, ChaserStrategy
+
+@pytest.fixture
+def standard_race_config():
+    """標準的な2000m、良馬場のレース設定"""
+    return RaceConfig(
+        distance=2000,
+        weather="Sunny",
+        track_condition="Good"
+    )
+
+@pytest.fixture
+def runaway_horse():
+    """標準的な『逃げ』馬のインスタンス"""
+    return Horse(
+        name="テストサイレンス",
+        stamina=1000,
+        speed=75,
+        strategy=RunawayStrategy()
+    )
+
+@pytest.fixture
+def chaser_horse():
+    """標準的な『追込』馬のインスタンス"""
+    return Horse(
+        name="テストシップ",
+        stamina=1200,
+        speed=70,
+        strategy=ChaserStrategy()
+    )
+
+
+7. テスト実行手順
+
+エンジニアはローカル環境のターミナルにて、以下のコマンドを用いてテストを実行してください。
+
+1. 全テストスイートの実行:
+2. 詳細なアサーション結果の表示:
+3. 特定のロジックモジュールのテストのみ実行:
+4. 実装不足（空のメソッド）による失敗を許容する場合: 現在、engine.py の実装が空のため、失敗することが正常です。開発時は特定のテストをターゲットに実行してください。
+
+8. 結論および今後の検証課題
+
+本テストレポートにより、v0.1.1 の基盤ロジックにおける品質指標が明確化されました。特に脚質間の相対的な性能差をテスト対象としたことで、単なる数値計算以上のドメインロジックの妥当性が担保されます。
+
+シニアエンジニアによるエッジケース検証提言
+
+今後のマイルストーンにおいて、以下のエッジケーステストの追加を推奨します。
+
+* 極端な境界値: 距離 0m のレース、スタミナ 10,000 超の馬、または極端に低い能力値での挙動。
+* 環境干渉: 「不良馬場」におけるスタミナ消費倍率の適用、および「雪」による最大速度低下のロジック検証。
+* 騎手補正の統合: Jockey の能力（追込適性など）が Strategy の計算値に与える乗法的補正のテスト。
+* 無効な入力: 不正な天候文字列や負の距離が設定された際の例外処理（ValueError 等）の検証。
