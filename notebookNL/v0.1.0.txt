@@ -1,0 +1,303 @@
+プログラム構成設計書：競馬シミュレータのモジュール化設計
+
+1. 構成の概要と設計思想
+
+目的
+
+本設計書は、プロトタイプ段階の密結合な単一スクリプトを、商用クオリティのメンテナンス性と拡張性を備えたモジュール化アーキテクチャへと再設計するための指針である。ソフトウェアアーキテクトの視点から、各コンポーネントの責務を明確に分離し、変更に強い柔軟な構造を構築する。
+
+設計方針
+
+* 関心の分離 (Separation of Concerns): 「データ定義（Model）」「移動ロジック（Strategy）」「物理計算（Engine）」「進行制御（Controller/Race）」「出力処理（View）」を物理的なファイル単位で分離する。
+* インターフェース（Protocol）による抽象化: 具象クラスではなくインターフェースに依存させることで、モジュール間の結合度を下げ、依存性の逆転（Dependency Inversion）を実現する。
+* 単一責任の原則 (SRP): 各クラスが持つ役割を一つに限定し、バグの混入を防ぐ。
+
+期待される効果
+
+* 高い保守性: 依存関係が疎結合であるため、特定のロジック修正がシステム全体に波及するリスクを最小化できる。
+* 優れた拡張性: 「開放閉鎖の原則 (Open-Closed Principle)」に基づき、既存コードを修正せずに新しい脚質や表示形式を追加できる。
+* テスト容易性の向上: 各モジュールが独立しているため、ユニットテストの導入が容易になる。
+
+
+--------------------------------------------------------------------------------
+
+
+2. ディレクトリ構造の定義
+
+標準的なPythonプロジェクトの構成に基づき、依存関係の循環を避け、クリーンなインポートグラフ（DAG）を形成する配置を採用する。
+
+project_root/
+│
+├── main.py           # エントリーポイント（DIコンテナの役割も兼ねる）
+├── models.py         # ドメインモデル定義（Jockey, Horse, RaceConfig）
+├── strategies.py     # 脚質・移動戦略の実装（MoveStrategy Protocol）
+├── engine.py         # シミュレーション物理計算エンジン
+├── observers.py      # 通信インターフェース定義（RaceObserver Protocol）
+├── view.py           # 表示処理（ConsoleViewの実装）
+└── race.py           # レース・ライフサイクル管理（Raceクラス）
+
+
+
+--------------------------------------------------------------------------------
+
+
+3. 各モジュールの詳細実装ガイド
+
+3.1 models.py (データ構造)
+
+ファイルの役割: レースを構成するエンティティのデータ定義を行う。ロジックを極力排除したデータクラスである。
+
+実装コード:
+
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from strategies import MoveStrategy
+
+@dataclass
+class Jockey:
+    """騎手の能力値を保持するデータクラス"""
+    name: str
+    front_skill: float  # 逃げ/先行時に影響
+    back_skill: float   # 差し/追い込み時に影響
+
+@dataclass
+class Horse:
+    """馬の属性と状態を管理するドメインモデル"""
+    name: str
+    speed: int
+    stamina: int
+    strategy: MoveStrategy
+    jockey: Jockey
+    position: int = 0
+
+@dataclass
+class RaceConfig:
+    """レースの環境設定"""
+    course_length: int = 100
+    interval: float = 0.5
+
+
+モジュール化の意図: データ構造を独立させることで、シミュレーションロジックの変更に影響されない安定した土台を構築する。 注意点: Horse と MoveStrategy は相互参照の関係にあるため、TYPE_CHECKING フラグを用いた前方参照（Forward References）により、実行時の循環参照を回避しつつ、静的解析ツール（mypy等）の恩恵を最大化する。
+
+3.2 strategies.py (移動戦略)
+
+ファイルの役割: 脚質に応じた移動距離の計算アルゴリズムをカプセル化する。
+
+実装コード:
+
+from __future__ import annotations
+from typing import Protocol, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from models import Horse, Jockey
+
+class MoveStrategy(Protocol):
+    """移動戦略のインターフェース規約"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int:
+        ...
+
+class RunawayStrategy:
+    """【逃げ】常に安定して前を走る戦略"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int:
+        # 騎手補正を加味した実質スピードを計算
+        effective_speed = int(horse.speed * jockey.front_skill)
+        # 常に最大スピード付近を維持するロジック（例：ベース速度の80%〜100%）
+        import random
+        return random.randint(int(effective_speed * 0.8), effective_speed)
+
+class ChaserStrategy:
+    """【追い込み】終盤に爆発力を発揮する戦略"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> int:
+        effective_speed = int(horse.speed * jockey.back_skill)
+        # 前半は抑え、後半（コース半分以降）に加速するロジック
+        if horse.position < (course_length / 2):
+            return random.randint(1, int(effective_speed * 0.5))
+        else:
+            return random.randint(effective_speed, int(effective_speed * 1.5))
+
+
+解説: Strategyパターンを採用することで、馬のクラスを修正することなく新しい脚質をプラグインのように追加可能。calculate_step 内では front_skill や back_skill をマルチプライヤーとして活用し、騎手と馬の相性を表現する。
+
+3.3 engine.py (シミュレーションエンジン)
+
+ファイルの役割: レースの物理的な進捗計算を担うステートレスな計算機。
+
+実装コード:
+
+from typing import List, Optional
+from models import Horse
+
+class SimulationEngine:
+    """各ステップの移動量計算と勝敗判定を司る"""
+    def __init__(self, course_length: int, horses: List[Horse]):
+        self.course_length = course_length
+        self.horses = horses
+
+    def step(self) -> Optional[Horse]:
+        """全頭を1ステップ進め、ゴール到達者がいればその馬を返す"""
+        for horse in self.horses:
+            move = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
+            horse.position += move
+            
+            # ゴール判定（最初の到達者を勝者とする）
+            if horse.position >= self.course_length:
+                return horse
+        return None
+
+
+解説: このクラスの役割は「計算」に限定されており、表示（View）や待機時間（Sleep）の制御は一切持たない。これにより、エンジンのロジックのみを高速にユニットテストすることが可能となる。
+
+3.4 observers.py (インターフェース)
+
+ファイルの役割: Observerパターンにより、ロジック層と表示層を疎結合にする。
+
+実装コード:
+
+from typing import Protocol, List
+from models import Horse
+
+class RaceObserver(Protocol):
+    """レース進捗を監視するためのインターフェース定義"""
+    def on_race_start(self, horses: List[Horse]) -> None: ...
+    def on_step_executed(self, horses: List[Horse]) -> None: ...
+    def on_race_finished(self, winner: Horse) -> None: ...
+
+
+解説: Raceクラスが特定の表示クラス（例：ConsoleView）を知ることなく、抽象的な RaceObserver を通じて通知を行うことで、表示媒体をCLIからGUIやWebへ変更する際の修正をゼロにする。
+
+3.5 view.py (表示処理)
+
+ファイルの役割: 標準出力を用いたレース状況の可視化。
+
+実装コード:
+
+from typing import List
+from observers import RaceObserver
+from models import Horse
+from strategies import RunawayStrategy
+
+class ConsoleView(RaceObserver):
+    """コンソールでの可視化を担当する具象Observer"""
+    def on_race_start(self, horses: List[Horse]):
+        print("--- レース開始 ---")
+        self._print_status(horses)
+
+    def on_step_executed(self, horses: List[Horse]):
+        self._print_status(horses)
+
+    def on_race_finished(self, winner: Horse):
+        print(f"\n--- レース終了 ---\n🏆 勝者: {winner.name} 🏆 (騎手: {winner.jockey.name})")
+
+    def _print_status(self, horses: List[Horse]):
+        print("\n現在の状況:")
+        for horse in horses:
+            visual_path = "-" * (horse.position // 5)
+            strategy_name = "逃げ" if isinstance(horse.strategy, RunawayStrategy) else "追込"
+            
+            # ソースコンテキストに基づくスタミナ低下判定（50m以降でスタミナ50未満ならバテ）
+            status_tag = "（バテ）" if horse.position > 50 and horse.stamina < 50 else ""
+            
+            print(f"{horse.name}{status_tag} ({horse.jockey.name}騎手) [{strategy_name}]: "
+                  f"{visual_path}▶ ({horse.position}m)")
+
+
+解説: isinstance を用いた戦略の判別や、status_tag による内部パラメータの可視化など、エンジンの生データをユーザー向けの表現に変換する責務を負う。
+
+3.6 race.py (レース管理)
+
+ファイルの役割: レースのライフサイクルとコンポーネント間のオーケストレーション。
+
+実装コード:
+
+import time
+from typing import List, Optional
+from models import Horse, RaceConfig
+from engine import SimulationEngine
+from observers import RaceObserver
+
+class Race:
+    """各コンポーネントを統合し、レース進行を制御する"""
+    def __init__(self, config: RaceConfig, horses: List[Horse]):
+        self.config = config
+        self.horses = horses
+        self.engine = SimulationEngine(config.course_length, horses)
+        self.winner: Optional[Horse] = None
+        self._observers: List[RaceObserver] = []
+
+    def attach(self, observer: RaceObserver):
+        """表示用オブザーバーの登録（複数可）"""
+        self._observers.append(observer)
+
+    def start(self):
+        """レースループの実行"""
+        for o in self._observers: o.on_race_start(self.horses)
+        
+        while self.winner is None:
+            self.winner = self.engine.step()
+            for o in self._observers: o.on_step_executed(self.horses)
+            
+            if not self.winner:
+                time.sleep(self.config.interval)
+                
+        for o in self._observers: o.on_race_finished(self.winner)
+
+
+解説: SimulationEngine による状態更新と、observers への通知、そして time.sleep による時間制御を統合する「オーケストレーター」として機能する。
+
+3.7 main.py (エントリーポイント)
+
+ファイルの役割: アプリケーションのブートストラップと依存関係の注入 (DI)。
+
+実装コード:
+
+from models import Jockey, Horse, RaceConfig
+from strategies import RunawayStrategy, ChaserStrategy
+from race import Race
+from view import ConsoleView
+
+def main():
+    # 1. コンフィグ設定
+    config = RaceConfig(course_length=100, interval=0.5)
+    
+    # 2. 依存オブジェクトの生成と注入
+    j1 = Jockey("山田", 1.2, 0.8)
+    j2 = Jockey("佐藤", 0.7, 1.3)
+    
+    h1 = Horse("サイレンススズカ", 12, 45, RunawayStrategy(), j1)
+    h2 = Horse("ディープインパクト", 14, 80, ChaserStrategy(), j2)
+    
+    # 3. システム構築（DI）
+    race = Race(config, [h1, h2])
+    race.attach(ConsoleView())
+    
+    # 4. 実行
+    race.start()
+
+if __name__ == "__main__":
+    main()
+
+
+
+--------------------------------------------------------------------------------
+
+
+4. 実装上の技術的留意事項
+
+* 循環参照（Circular Import）の高度な回避策:
+  * from __future__ import annotations を全モジュールの冒頭に配置することを推奨する。これにより、実行時に型ヒントが評価されず文字列として扱われるため、インポートの順序問題が劇的に解消される。
+  * TYPE_CHECKING ブロック内でのみインポートを行うことで、実行時の依存関係を完全に除去し、静的解析時のみ情報を共有する。
+* 型安全性の確保:
+  * Protocol を用いることで、Go言語のような「構造的部分型」に近い柔軟なインターフェース定義が可能になる。具象クラスを継承する必要がないため、テスト用のモック作成も容易となる。
+* 開放閉鎖の原則 (OCP) の徹底:
+  * 本設計では、新しい戦略（「先行」「差し」）や、新しいログ出力先（「DB保存」「GUI」）を追加する際に、既存の Race クラスや Horse クラスのソースコードを1行も書き換える必要がない。これは大規模システムにおいてバグの混入を避けるための最重要原則である。
+
+
+--------------------------------------------------------------------------------
+
+
+5. まとめ
+
+本構成を採用することで、当初の単一スクリプトは、エンタープライズレベルの Python アプリケーションへと進化する。データ、ロジック、表示が明確に分離されたことで、シミュレーションのルール変更やUIの刷新といった将来の要求に対しても、最小限のコストで迅速かつ安全に対応することが可能である。ソフトウェアアーキテクチャの基本に忠実なこの設計は、長期的なプロジェクト運用において真価を発揮するだろう。
