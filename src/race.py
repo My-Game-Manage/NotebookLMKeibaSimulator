@@ -2,6 +2,7 @@
 レースのライフサイクルを管理します
 
 - Race クラスで、エンジンの elapsed_time を View に渡せるように調整します
+- レースの終了条件を「勝者が決まるまで」から「全馬がゴールするまで」に変更します
 """
 from __future__ import annotations
 import time
@@ -41,4 +42,23 @@ class Race:
                     
         for o in self._observers:
             o.on_race_finished(self.winner, self.engine.elapsed_time)
+            
+    def run(self) -> None:
+        for observer in self._observers:
+            observer.on_race_start(self.horses)
+
+        # 全馬がゴールするまでループを回す
+        while not self.engine.is_all_finished():
+            self.engine.step()
+            
+            for observer in self._observers:
+                observer.on_step_executed(self.horses, self.engine.elapsed_time)
+            
+            time.sleep(self.config.interval)
+
+        # 全馬の順位（rankings）を渡して終了通知
+        for observer in self._observers:
+            # Observerのインターフェースも List[Horse] を受け取れるよう修正が必要
+            observer.on_race_finished(self.engine.rankings, self.engine.elapsed_time)
+
 
