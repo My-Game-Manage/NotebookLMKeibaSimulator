@@ -3,6 +3,7 @@
 
 - エンジンに「経過時間」の保持機能を追加し、速度 × 時間 で移動距離を算出するように修正します
 - エンジン側で、ゴールした馬を順番に記録する rankings リストを管理するようにします
+- 移動距離に応じてスタミナを減算する処理を追加します
 """
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
@@ -29,10 +30,22 @@ class SimulationEngine:
             if horse in self.rankings:
                 continue
 
-            # 移動計算
-            speed_per_sec = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
-            horse.position += speed_per_sec * self.tick_time
-            
+            # 1. 現在の能力とスタミナ状態に基づき速度を計算
+            speed_per_sec = horse.strategy.calculate_step(
+                horse, horse.jockey, self.course_length
+            )
+        
+            # 2. 移動とスタミナ消費
+            distance = speed_per_sec * self.tick_time
+            horse.position += distance
+        
+            # スタミナ消費ロジック（例: 移動距離分だけスタミナを減らす）
+            # 激しく走るほど（速度が速いほど）消費量が増える計算
+            if horse.current_stamina > 0:
+                horse.current_stamina -= distance
+                if horse.current_stamina < 0:
+                    horse.current_stamina = 0.0
+
             # ゴール判定
             if horse.position >= self.course_length:
                 horse.position = float(self.course_length)
