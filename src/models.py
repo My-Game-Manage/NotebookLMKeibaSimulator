@@ -26,7 +26,7 @@ class Horse:
     stamina: int
     strategy: MoveStrategy
     jockey: Jockey
-    position: int = 0
+    position: float = 0.0
 
 @dataclass
 class RaceConfig:
