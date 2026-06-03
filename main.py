@@ -23,7 +23,7 @@ def main():
     race.attach(ConsoleView())
     
     # 4. レース開始
-    race.start()
+    race.run()
 
 if __name__ == "__main__":
     main()

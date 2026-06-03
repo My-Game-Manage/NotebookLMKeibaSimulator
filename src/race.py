@@ -25,24 +25,6 @@ class Race:
     def attach(self, observer: RaceObserver):
         self._observers.append(observer)
 
-    def start(self):
-        for o in self._observers:
-            o.on_race_start(self.horses)
-
-        while self.winner is None:
-            self.winner = self.engine.step()
-            # Viewに現在の経過時間を伝える（必要に応じてObserverを拡張）
-            # エンジンの経過時間を取得して通知
-            current_time = self.engine.elapsed_time
-            for o in self._observers:
-                o.on_step_executed(self.horses, current_time)
-        
-            if not self.winner:
-                time.sleep(self.config.interval)
-                    
-        for o in self._observers:
-            o.on_race_finished(self.winner, self.engine.elapsed_time)
-            
     def run(self) -> None:
         for observer in self._observers:
             observer.on_race_start(self.horses)
