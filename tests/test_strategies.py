@@ -18,8 +18,8 @@ def test_runaway_strategy_range(setup_data):
     
     for _ in range(100):
         move = strategy.calculate_step(horse, setup_data, 100)
-        # speed 10 * skill 1.0 = 10. 範囲は 8～10
-        assert 15 <= move <= 16.5
+        # v0.1.1 の新しい速度設計（約16〜20m/s）
+        assert 15.0 <= move <= 20.0
 
 def test_chaser_strategy_phases(setup_data):
     """追込馬が前半抑え、後半加速するか確認"""
