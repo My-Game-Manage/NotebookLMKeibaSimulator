@@ -1,0 +1,367 @@
+これは私がPythonで開発している競馬シミュレータのソースコード（クラス定義や物理演算ロジック）です。全体の構造の把握や、今後のリファクタリング、機能追加の相談のためにアップロードしています。
+
+
+1. ディレクトリ構造の定義
+
+project_root/
+│
+├─ main.py           # エントリーポイント（DIコンテナの役割も兼ねる）
+├─ src/
+├── models.py         # ドメインモデル定義（Jockey, Horse, RaceConfig）
+├── strategies.py     # 脚質・移動戦略の実装（MoveStrategy Protocol）
+├── engine.py         # シミュレーション物理計算エンジン
+├── observers.py      # 通信インターフェース定義（RaceObserver Protocol）
+├── view.py           # 表示処理（ConsoleViewの実装）
+├── race.py           # レース・ライフサイクル管理（Raceクラス）
+├─ tests/
+├── test_engine.py    # テスト（engine） 
+├── test_models.py    # テスト（Horse）
+├── test_race.py      # テスト（Race）
+└── test_view.py      # テスト（view）
+
+2. 各モジュールの詳細実装
+
+2.1. src/engine.py
+
+from __future__ import annotations
+from typing import List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .models import Horse
+
+class SimulationEngine:
+    """秒単位の物理計算を行うエンジン"""
+    def __init__(self, course_length: int, horses: List[Horse], tick_time: float):
+        self.course_length = course_length
+        self.horses = horses
+        self.tick_time = tick_time
+        self.elapsed_time = 0.0  # 経過時間を管理
+
+    def step(self) -> Optional[Horse]:
+        """全馬を1ステップ進め、勝者がいれば返す"""
+        self.elapsed_time += self.tick_time
+        winner: Optional[Horse] = None
+        
+        for horse in self.horses:
+            # 1. 現在の秒速を取得
+            speed_per_sec = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
+            # 2. 移動距離 = 秒速 × ステップ秒数
+            distance = speed_per_sec * self.tick_time
+            horse.position += distance
+            
+            if horse.position >= self.course_length and winner is None:
+                winner = horse
+        return winner
+
+2.2. src/models.py
+
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .strategies import MoveStrategy
+
+@dataclass
+class Jockey:
+    """騎手の能力値を保持するデータクラス"""
+    name: str
+    front_skill: float
+    back_skill: float
+
+@dataclass
+class Horse:
+    """馬の属性と状態を管理するドメインモデル"""
+    name: str
+    speed: int
+    stamina: int
+    strategy: MoveStrategy
+    jockey: Jockey
+    position: float = 0.0
+
+@dataclass
+class RaceConfig:
+    """1600mレースと秒単位計算に対応した設定"""
+    course_length: int = 1600  # 100mから1600mへ拡張 [3]
+    tick_time: float = 0.1     # 1ステップあたりの論理時間（秒）
+    interval: float = 0.01     # 実際の表示更新間隔（秒）
+
+2.3. src/observers.py
+
+from __future__ import annotations
+from typing import Protocol, List, TYPE_CHECKING, runtime_checkable
+
+if TYPE_CHECKING:
+    from .models import Horse
+
+@runtime_checkable
+class RaceObserver(Protocol):
+    """レース進捗を監視するためのインターフェース定義"""
+    def on_race_start(self, horses: List[Horse]) -> None: ...
+    def on_step_executed(self, horses: List[Horse], elapsed_time: float) -> None: ...
+    def on_race_finished(self, winner: Horse, elapsed_time: float) -> None: ...
+
+2.4. src/race.py
+
+from __future__ import annotations
+import time
+from typing import List, Optional, TYPE_CHECKING
+from .engine import SimulationEngine
+
+if TYPE_CHECKING:
+    from .models import Horse, RaceConfig
+    from .observers import RaceObserver
+
+class Race:
+    """各コンポーネントを統合し、レース進行を制御する"""
+    def __init__(self, config: RaceConfig, horses: List[Horse]):
+        self.config = config
+        self.horses = horses
+        self.engine = SimulationEngine(config.course_length, horses, config.tick_time)
+        self.winner: Optional[Horse] = None
+        self._observers: List[RaceObserver] = []
+
+    def attach(self, observer: RaceObserver):
+        self._observers.append(observer)
+
+    def start(self):
+        for o in self._observers:
+            o.on_race_start(self.horses)
+
+        while self.winner is None:
+            self.winner = self.engine.step()
+            # Viewに現在の経過時間を伝える（必要に応じてObserverを拡張）
+            # エンジンの経過時間を取得して通知
+            current_time = self.engine.elapsed_time
+            for o in self._observers:
+                o.on_step_executed(self.horses, current_time)
+        
+            if not self.winner:
+                time.sleep(self.config.interval)
+                    
+        for o in self._observers:
+            o.on_race_finished(self.winner, self.engine.elapsed_time)
+
+2.5. src/strategies.py
+
+from __future__ import annotations
+import random
+from typing import Protocol, TYPE_CHECKING, runtime_checkable
+
+if TYPE_CHECKING:
+    from .models import Horse, Jockey
+
+@runtime_checkable
+class MoveStrategy(Protocol):
+    """移動戦略のインターフェース規約"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float: ...
+
+class RunawayStrategy:
+    """【逃げ】秒速約17m前後で安定走行"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
+        # 1600mを約95秒で走るベース速度 (16.8 m/s)
+        base_speed = 16.0 + (horse.speed / 100.0) * jockey.front_skill
+        return base_speed * random.uniform(0.98, 1.02)
+
+class ChaserStrategy:
+    """【追い込み】後半に時速を上げる"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
+        is_latter_half = horse.position > (course_length / 2)
+        # 前半は抑え(15m/s)、後半にスパート(19m/s)
+        multiplier = 1.2 if is_latter_half else 0.9
+        base_speed = 16.5 * multiplier * jockey.back_skill
+        return base_speed * random.uniform(0.95, 1.05)
+
+2.6. src/view.py
+
+from __future__ import annotations
+from typing import List, TYPE_CHECKING
+from .strategies import RunawayStrategy
+
+if TYPE_CHECKING:
+    from .models import Horse
+
+class ConsoleView:
+    """コンソールでの可視化を担当する具象Observer"""
+    def on_race_start(self, horses: List[Horse]):
+        print("--- レース開始 ---")
+        self._print_status(horses, 0.0)
+
+    def on_step_executed(self, horses: List[Horse], elapsed_time: float):
+        self._print_status(horses, elapsed_time)
+
+    def on_race_finished(self, winner: Horse, elapsed_time: float):
+        print(f"\n--- レース終了 ---")
+        print(f"タイム: {elapsed_time:.2f}秒")
+        print(f"🏆 勝者: {winner.name} 🏆 (騎手: {winner.jockey.name})")
+
+    def _print_status(self, horses: List[Horse], elapsed_time: float):
+        print(f"\n現在の状況 (経過時間: {elapsed_time:.1f}秒):")
+        for horse in horses:
+            # 表示上の進捗バー（1600mを32文字分などで表現）
+            # 1600mを32文字分（50mにつき1文字）で表現
+            visual_path = "-" * int(horse.position // 50)
+            # v0.1.0の名残である「バテ表示」などの条件があればここに追加可能
+            print(f"{horse.name}: {visual_path}▶ ({horse.position:.1f}m)")
+
+2.7. main.py
+
+from __future__ import annotations
+from src.models import Jockey, Horse, RaceConfig
+from src.strategies import RunawayStrategy, ChaserStrategy
+from src.race import Race
+from src.view import ConsoleView
+
+def main():
+    # 1. コンフィグ設定
+    config = RaceConfig(course_length=1600, interval=0.01, tick_time=0.1)
+    
+    # 2. 騎手と馬の生成
+    j1 = Jockey("武豊", 1.2, 1.0)
+    j2 = Jockey("ルメール", 1.0, 1.2)
+    
+    h1 = Horse("サイレンススズカ", 8, 80, RunawayStrategy(), j1)
+    h2 = Horse("ゴールドシップ", 10, 95, ChaserStrategy(), j2)
+    
+    # 3. レースの構築
+    race = Race(config, [h1, h2])
+    race.attach(ConsoleView())
+    
+    # 4. レース開始
+    race.start()
+
+if __name__ == "__main__":
+    main()
+
+3. 各モジュールテストの詳細実装
+
+3.1. tests/test_engine.py
+
+from __future__ import annotations
+import pytest
+from src.models import Horse, Jockey
+from src.engine import SimulationEngine
+from src.strategies import RunawayStrategy
+
+def test_engine_step_advances_horse():
+    jockey = Jockey("テスト", 1.0, 1.0)
+    horse = Horse("馬", 10, 100, RunawayStrategy(), jockey)
+    engine = SimulationEngine(100, [horse], 0.1)
+    
+    initial_pos = horse.position
+    engine.step()
+    assert horse.position > initial_pos
+
+def test_engine_winner_detection():
+    jockey = Jockey("テスト", 1.0, 1.0)
+    horse = Horse("馬", 10, 100, RunawayStrategy(), jockey)
+    engine = SimulationEngine(100, [horse], 0.1)
+    
+    horse.position = 99
+    winner = engine.step()
+    assert winner is not None
+    assert winner.name == "馬"
+
+3.2. tests/test_models.py
+
+from __future__ import annotations
+import pytest
+from src.models import Jockey, Horse, RaceConfig
+from src.strategies import RunawayStrategy
+
+def test_jockey_creation():
+    jockey = Jockey("武豊", 1.2, 1.0)
+    assert jockey.name == "武豊"
+    assert jockey.front_skill == 1.2
+
+def test_horse_creation():
+    jockey = Jockey("テスト", 1.0, 1.0)
+    strategy = RunawayStrategy()
+    horse = Horse("テスト馬", 10, 100, strategy, jockey)
+    assert horse.name == "テスト馬"
+    assert horse.position == 0
+
+def test_race_config_defaults():
+    config = RaceConfig()
+    assert config.course_length == 1600
+    assert config.interval == 0.01
+
+3.3 tests/test_race.py
+
+from __future__ import annotations
+import pytest
+from src.models import Horse, Jockey, RaceConfig
+from src.strategies import RunawayStrategy
+from src.race import Race
+
+class MockObserver:
+    """テスト用のダミーObserver"""
+    def __init__(self):
+        self.started = False
+        self.finished = False
+    def on_race_start(self, horses): self.started = True
+    def on_step_executed(self, horses, elapsed_time): pass
+    def on_race_finished(self, winner, elapsed_time): self.finished = True
+
+def test_race_lifecycle():
+    config = RaceConfig(course_length=10, interval=0.01)
+    jockey = Jockey("テスト", 1.0, 1.0)
+    horse = Horse("馬", 100, 100, RunawayStrategy(), jockey) # すぐゴールする設定
+    
+    race = Race(config, [horse])
+    observer = MockObserver()
+    race.attach(observer)
+    
+    race.start()
+    
+    assert observer.started is True
+    assert observer.finished is True
+    assert race.winner is not None
+
+3.4. tests/test_strategies.py
+
+from __future__ import annotations
+import pytest
+from src.models import Horse, Jockey
+from src.strategies import RunawayStrategy, ChaserStrategy
+
+@pytest.fixture
+def setup_data():
+    jockey = Jockey("テスト", 1.0, 1.0)
+    return jockey
+
+def test_runaway_strategy_range(setup_data):
+    """逃げ馬の移動距離が規定の範囲内(80%-100%)か確認"""
+    strategy = RunawayStrategy()
+    horse = Horse("逃げ", 10, 100, strategy, setup_data)
+    
+    for _ in range(100):
+        move = strategy.calculate_step(horse, setup_data, 100)
+        # v0.1.1 の新しい速度設計（約16〜20m/s）
+        assert 15.0 <= move <= 20.0
+
+def test_chaser_strategy_phases(setup_data):
+    """追込馬が前半抑え、後半加速するか確認"""
+    strategy = ChaserStrategy()
+    horse = Horse("追込", 10, 100, strategy, setup_data)
+    
+    # 前半（位置0）
+    horse.position = 0
+    move_early = strategy.calculate_step(horse, setup_data, 100)
+    assert move_early <= 16 # 10 * 0.5
+    
+    # 後半（位置60）
+    horse.position = 60
+    move_late = strategy.calculate_step(horse, setup_data, 100)
+    assert move_late >= 10 # 10 * 1.0
+
+3.5. tests/test_view.py
+
+from __future__ import annotations
+from src.view import ConsoleView
+from src.observers import RaceObserver
+
+def test_console_view_implements_protocol():
+    view = ConsoleView()
+    # ConsoleViewがRaceObserverの要件を満たしているか確認
+    assert isinstance(view, RaceObserver)
