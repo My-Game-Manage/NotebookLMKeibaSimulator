@@ -13,8 +13,8 @@ class MockObserver:
         self.started = False
         self.finished = False
     def on_race_start(self, horses): self.started = True
-    def on_step_executed(self, horses): pass
-    def on_race_finished(self, winner): self.finished = True
+    def on_step_executed(self, horses, elapsed_time): pass
+    def on_race_finished(self, winner, elapsed_time): self.finished = True
 
 def test_race_lifecycle():
     config = RaceConfig(course_length=10, interval=0.01)
