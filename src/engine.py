@@ -4,6 +4,7 @@
 - エンジンに「経過時間」の保持機能を追加し、速度 × 時間 で移動距離を算出するように修正します
 - エンジン側で、ゴールした馬を順番に記録する rankings リストを管理するようにします
 - 移動距離に応じてスタミナを減算する処理を追加します
+- スパート中はスタミナ消費を激しくすることで、より戦略的なシミュレーションになります
 """
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
@@ -41,8 +42,11 @@ class SimulationEngine:
         
             # スタミナ消費ロジック（例: 移動距離分だけスタミナを減らす）
             # 激しく走るほど（速度が速いほど）消費量が増える計算
+            consumption = distance
+            if horse.is_spurting:
+                consumption *= 1.5  # スパート中は1.5倍スタミナを消費する
             if horse.current_stamina > 0:
-                horse.current_stamina -= distance
+                horse.current_stamina -= consumption
                 if horse.current_stamina < 0:
                     horse.current_stamina = 0.0
 

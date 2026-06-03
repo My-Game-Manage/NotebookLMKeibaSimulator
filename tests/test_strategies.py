@@ -16,60 +16,68 @@ def test_runaway_strategy_stamina_penalty(setup_data):
     """スタミナ切れ時に逃げ馬の速度が低下するか確認"""
     strategy = RunawayStrategy()
     
-    # 1. スタミナが十分にある状態
-    horse_ok = Horse("元気な逃げ馬", 50, 1000, strategy, setup_data)
+    # 条件を揃えるため、両方ともスパート状態にする
+    horse_ok = Horse("元気な逃げ馬", 50, 2000, strategy, setup_data)
+    horse_ok.is_spurting = True
     speed_ok = strategy.calculate_step(horse_ok, setup_data, 1600)
     
-    # 2. スタミナが切れた状態 (current_staminaを0に設定)
-    horse_tired = Horse("バテた逃げ馬", 50, 1000, strategy, setup_data)
+    horse_tired = Horse("バテた逃げ馬", 50, 2000, strategy, setup_data)
+    horse_tired.is_spurting = True
     horse_tired.current_stamina = 0.0
     speed_tired = strategy.calculate_step(horse_tired, setup_data, 1600)
     
     # 検証: スタミナ切れの方が明らかに遅いこと
     assert speed_tired < speed_ok
-    # ペナルティ倍率(0.6)が概ね適用されているか（ランダム誤差を考慮して0.5〜0.7の範囲か）
+    # ペナルティ(0.6)が適用されているか
     assert 0.5 < (speed_tired / speed_ok) < 0.7
 
 def test_chaser_strategy_stamina_penalty(setup_data):
     """スタミナ切れ時に追込馬のスパート速度が低下するか確認"""
     strategy = ChaserStrategy()
     
-    # 後半(900m)でスパート中の元気な馬
-    horse_ok = Horse("元気な追込馬", 50, 1000, strategy, setup_data)
-    horse_ok.position = 900.0
+    # 条件を揃えるため、スパート中の状態で比較
+    horse_ok = Horse("元気な追込馬", 50, 2000, strategy, setup_data)
+    horse_ok.is_spurting = True
     speed_ok = strategy.calculate_step(horse_ok, setup_data, 1600)
     
-    # 後半(900m)でスタミナが切れた馬
-    horse_tired = Horse("バテた追込馬", 50, 1000, strategy, setup_data)
-    horse_tired.position = 900.0
+    horse_tired = Horse("バテた追込馬", 50, 2000, strategy, setup_data)
+    horse_tired.is_spurting = True
     horse_tired.current_stamina = 0.0
     speed_tired = strategy.calculate_step(horse_tired, setup_data, 1600)
     
-    # 検証
     assert speed_tired < speed_ok
     assert 0.5 < (speed_tired / speed_ok) < 0.7
 
 def test_chaser_strategy_phases_with_stamina(setup_data):
-    """スタミナがある状態で、追込馬が後半に加速することを確認"""
+    """スタミナの状態によって、追込馬が適切に加速（スパート）することを確認"""
     strategy = ChaserStrategy()
-    horse = Horse("追込馬", 50, 2000, strategy, setup_data)
+    
+    # スタミナを 500 に設定
+    # 400m地点: 残り1200m。500 < (1200 * 1.2) なのでスパートしないはず
+    # 1200m地点: 残り400m。500 > (400 * 1.2) なのでスパートするはず
+    horse = Horse("追込馬", 50, 500, strategy, setup_data)
     
     # 前半 (400m地点)
     horse.position = 400.0
-    speed_first = strategy.calculate_step(horse, setup_data, 1600)
+    horse.is_spurting = False # 初期化
+    speed_cruising = strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is False
     
     # 後半 (1200m地点)
     horse.position = 1200.0
-    speed_second = strategy.calculate_step(horse, setup_data, 1600)
+    speed_spurt = strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is True
     
-    # 検証: 後半の方が速い（スパートがかかっている）
-    assert speed_second > speed_first
+    # 検証: スパート時の方が速い
+    assert speed_spurt > speed_cruising
 
 def test_runaway_strategy_range(setup_data):
-    """逃げ馬の移動速度が概ね期待される範囲(16.0m/s以上)にあるか確認"""
+    """逃げ馬の移動速度が概ね期待される範囲にあるか確認"""
     strategy = RunawayStrategy()
-    horse = Horse("逃げ", 50, 1000, strategy, setup_data)
+    horse = Horse("逃げ", 50, 100, strategy, setup_data)
+    # 巡航速度の状態を確認
+    horse.is_spurting = False
     speed = strategy.calculate_step(horse, setup_data, 1600)
     
-    # 基準速度16.0m/s付近であることを確認
-    assert 15.0 < speed < 18.0
+    # 巡航速度(16.5m/s * 0.95倍付近)を確認
+    assert 14.0 < speed < 17.0
