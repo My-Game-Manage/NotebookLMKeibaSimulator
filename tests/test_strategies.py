@@ -4,7 +4,7 @@
 from __future__ import annotations
 import pytest
 from src.models import Horse, Jockey
-from src.strategies import RunawayStrategy, ChaserStrategy
+from src.strategies import RunawayStrategy, ChaserStrategy, FrontRunnerStrategy, MidPackerStrategy
 
 @pytest.fixture
 def setup_data():
@@ -30,6 +30,34 @@ def test_runaway_strategy_stamina_penalty(setup_data):
     assert speed_tired < speed_ok
     # ペナルティ(0.6)が適用されているか
     assert 0.5 < (speed_tired / speed_ok) < 0.7
+
+def test_front_runner_strategy_phases(setup_data):
+    """先行馬が適切なタイミング(係数0.9)でスパートするか確認"""
+    strategy = FrontRunnerStrategy()
+    # 400m地点(残り1200m)でスタミナ1000：1200 * 0.9 = 1080 なのでスパートしない
+    horse = Horse("先行馬", 50, 1000, strategy, setup_data)
+    horse.position = 400.0
+    strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is False
+
+    # 800m地点(残り800m)でスタミナ1000：800 * 0.9 = 720 なのでスパートする
+    horse.position = 800.0
+    strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is True
+
+def test_mid_packer_strategy_phases(setup_data):
+    """差し馬が適切なタイミング(係数1.1)でスパートするか確認"""
+    strategy = MidPackerStrategy()
+    # 800m地点(残り800m)でスタミナ800：800 * 1.1 = 880 なのでスパートしない
+    horse = Horse("差し馬", 50, 800, strategy, setup_data)
+    horse.position = 800.0
+    strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is False
+
+    # 1000m地点(残り600m)でスタミナ800：600 * 1.1 = 660 なのでスパートする
+    horse.position = 1000.0
+    strategy.calculate_step(horse, setup_data, 1600)
+    assert horse.is_spurting is True
 
 def test_chaser_strategy_stamina_penalty(setup_data):
     """スタミナ切れ時に追込馬のスパート速度が低下するか確認"""
