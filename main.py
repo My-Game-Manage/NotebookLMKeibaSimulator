@@ -3,6 +3,7 @@
 
 - 生成する馬のスタミナ値を、1600mという距離に対して適切な範囲に設定します
 - 「先行（FrontRunnerStrategy）」と「差し（MidPackerStrategy）」を組み込み、4頭サンプルに
+- explosiveness は 0〜100 の整数値（int）として、各馬のインスタンス化の際、stamina と strategy の間に引数として追加します
 """
 from __future__ import annotations
 from src.models import Jockey, Horse, RaceConfig
@@ -26,28 +27,29 @@ def main():
 
     # 3. 4つの脚質が揃った馬のラインナップ [1, 2]
     # speed: 基本速度に影響 / stamina: スパート開始タイミングとバテにくさに影響
+    # explosiveness（瞬発力）を追加。追い込み馬や差し馬は高めに設定。
     horses = [
         Horse(
             name="サイレンス逃げ", 
-            speed=75, stamina=1150, 
+            speed=75, stamina=1150, explosiveness=40,  # 逃げは粘り重視
             strategy=RunawayStrategy(), 
             jockey=jockey_a
         ),
         Horse(
             name="テイオー先行", 
-            speed=70, stamina=1300, 
+            speed=70, stamina=1300, explosiveness=60, 
             strategy=FrontRunnerStrategy(), 
             jockey=jockey_b
         ),
         Horse(
             name="オグリ差し", 
-            speed=65, stamina=1400, 
+            speed=65, stamina=1400, explosiveness=80,  # 差し・追込は瞬発力を高く
             strategy=MidPackerStrategy(), 
             jockey=jockey_c
         ),
         Horse(
             name="ゴルシ追込", 
-            speed=60, stamina=1550, 
+            speed=60, stamina=1550, explosiveness=90, 
             strategy=ChaserStrategy(), 
             jockey=jockey_c
         ),

@@ -4,6 +4,7 @@
 - レース設定に論理的な時間単位（tick_time）を追加し、距離を float で扱えるようにします
 - レース中の残りスタミナを管理する current_stamina プロパティを追加します
 - 馬が現在スパート状態にあるかどうかを保持するフラグ is_spurting を追加します
+- 「瞬発力（explosiveness）」を追加。このパラメータは、0〜100の範囲で馬の「終いの脚の鋭さ」を表現する数値として定義します
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ class Horse:
     name: str
     speed: int
     stamina: int
+    explosiveness: int  # 新規追加：瞬発力（0〜100。スパート時の加速力に影響）
     strategy: MoveStrategy
     jockey: Jockey
     position: float = 0.0

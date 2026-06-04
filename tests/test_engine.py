@@ -1,5 +1,7 @@
 """
 物理計算エンジンが正しく馬を進め、ゴール判定を行うかを検証します
+
+- Horseクラスにexplosiveness を追加
 """
 from __future__ import annotations
 import pytest
@@ -9,7 +11,8 @@ from src.strategies import RunawayStrategy
 
 def test_engine_step_advances_horse():
     jockey = Jockey("テスト", 1.0, 1.0)
-    horse = Horse("馬", 10, 100, RunawayStrategy(), jockey)
+    # 第4引数に 50 を追加
+    horse = Horse("馬", 10, 100, 50, RunawayStrategy(), jockey)
     engine = SimulationEngine(100, [horse], 0.1)
     
     initial_pos = horse.position
@@ -19,8 +22,9 @@ def test_engine_step_advances_horse():
 def test_engine_rankings_order():
     jockey = Jockey("テスト", 1.0, 1.0)
     # 足の速い馬と遅い馬を用意
-    fast_horse = Horse("速い馬", 100, 100, RunawayStrategy(), jockey)
-    slow_horse = Horse("遅い馬", 10, 100, RunawayStrategy(), jockey)
+    # 第4引数に 50 を追加
+    fast_horse = Horse("速い馬", 100, 100, 50, RunawayStrategy(), jockey)
+    slow_horse = Horse("遅い馬", 10, 100, 50, RunawayStrategy(), jockey)
     
     engine = SimulationEngine(100, [fast_horse, slow_horse], 0.1)
     
