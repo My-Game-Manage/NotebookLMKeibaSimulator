@@ -2,6 +2,8 @@
 データクラスのみを定義する安定した土台です。
 
 - レース設定に論理的な時間単位（tick_time）を追加し、距離を float で扱えるようにします
+- レース中の残りスタミナを管理する current_stamina プロパティを追加します
+- 馬が現在スパート状態にあるかどうかを保持するフラグ is_spurting を追加します
 """
 
 from __future__ import annotations
@@ -27,6 +29,12 @@ class Horse:
     strategy: MoveStrategy
     jockey: Jockey
     position: float = 0.0
+    current_stamina: float = 0.0 # レース開始時に stamina の値で初期化する
+    is_spurting: bool = False  # スパート中かどうかのフラグを追加
+
+    def __post_init__(self):
+        # インスタンス化の直後に現在のスタミナを最大値に設定
+        self.current_stamina = float(self.stamina)
 
 @dataclass
 class RaceConfig:

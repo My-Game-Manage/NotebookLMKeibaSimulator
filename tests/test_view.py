@@ -7,5 +7,6 @@ from src.observers import RaceObserver
 
 def test_console_view_implements_protocol():
     view = ConsoleView()
-    # ConsoleViewがRaceObserverの要件を満たしているか確認
+    # ConsoleViewが修正後のRaceObserver（rankingsを受け取る形式）に
+    # 適合しているか runtime_checkable で確認
     assert isinstance(view, RaceObserver)
