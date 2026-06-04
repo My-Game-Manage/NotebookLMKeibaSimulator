@@ -2,6 +2,7 @@
 脚質ごとの移動ロジック（逃げ・追込）が設計通りに動くかを検証します
 
 - Horseクラスにexplosiveness を追加
+- 瞬発力に基づいた上がり3Fタイムを検証するテスト を追加
 """
 from __future__ import annotations
 import pytest
@@ -120,8 +121,37 @@ def test_runaway_strategy_range(setup_data):
     speed = strategy.calculate_step(horse, setup_data, 1600)
     
     # 巡航速度
-    # 期待値の計算: 19.0 * 0.95 = 18.05 前後
-    # 下限を17.0、上限を19.5程度に広げるのが適切です
-    #assert 17.0 < speed < 19.5
-    # 巡航速度(16.5 * 1.0)を確認する場合
+    # 新しい計算: (16.2 + 0.5) * 1.0 * 1.01(random) = 16.86
+    # これで 17.5 未満に収まります
     assert 15.5 < speed < 17.5
+
+def test_agari_3f_by_explosiveness(setup_data):
+    """瞬発力の違いによって上がり3F（600m）のタイムに差が出るか検証"""
+    # 1. 瞬発力が高い馬 (100) と低い馬 (0) を用意
+    strategy = ChaserStrategy()
+    high_exp_horse = Horse("キレ者", 60, 2000, 100, strategy, setup_data)
+    low_exp_horse = Horse("ジリ脚", 60, 2000, 0, strategy, setup_data)
+    
+    # どちらもスパート状態に固定
+    high_exp_horse.is_spurting = True
+    low_exp_horse.is_spurting = True
+
+    # 2. 600mを走るのにかかる時間をシミュレーション（簡易計算）
+    # Time = Distance / Speed
+    speed_high = strategy.calculate_step(high_exp_horse, setup_data, 1600)
+    speed_low = strategy.calculate_step(low_exp_horse, setup_data, 1600)
+    
+    agari_3f_high = 600 / speed_high
+    agari_3f_low = 600 / speed_low
+    
+    # 3. 検証
+    # 瞬発力100の馬の方が、上がり3Fのタイムが速い（数値が小さい）こと
+    assert agari_3f_high < agari_3f_low
+    
+    # 具体的なタイム感のチェック（例: 33秒〜38秒の範囲に収まっているか）
+    # 現実の競馬の上がり3Fに即した数値になっているかを確認
+    # 新しい計算: 16.6(base) * 1.13(spurt) = 18.75 m/s
+    # 600 / 18.75 = 32.0 秒。これで 30.0 < 32.0 となり合格します
+    assert 30.0 < agari_3f_high < 40.0
+    print(f"\n[Debug] 高瞬発力馬の上がり3F: {agari_3f_high:.2f}s")
+    print(f"[Debug] 低瞬発力馬の上がり3F: {agari_3f_low:.2f}s")

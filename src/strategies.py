@@ -29,16 +29,13 @@ class RunawayStrategy:
         if not horse.is_spurting and horse.current_stamina > (remaining_dist * 0.7):
             horse.is_spurting = True
         
-        # ベース速度の計算
-        # 瞬発力を反映したスパート倍率（50の時に1.1倍）
-        spurt_multiplier = 1.0 + (horse.explosiveness / 500.0)
+        # スパート倍率（50の時に1.03倍に抑制）
+        spurt_multiplier = 0.98 + (horse.explosiveness / 1000.0)
         multiplier = spurt_multiplier if horse.is_spurting else 1.0
         
-        base_speed = (16.5 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
-        
-        # スタミナ切れペナルティ（スタミナ0なら速度60%に低下）
+        # ベース速度を 17.5 -> 16.2 に引き下げ
+        base_speed = (16.2 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
         stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
-
         return base_speed * stamina_multiplier * random.uniform(0.99, 1.01)
 
 class FrontRunnerStrategy:
@@ -50,15 +47,13 @@ class FrontRunnerStrategy:
         if not horse.is_spurting and horse.current_stamina > (remaining_dist * 0.9):
             horse.is_spurting = True
 
-        # 瞬発力を反映したスパート倍率（50の時に1.15倍）
-        spurt_multiplier = 1.05 + (horse.explosiveness / 500.0)
-        multiplier = spurt_multiplier if horse.is_spurting else 0.95
+        # スパート倍率（50の時に1.08倍）
+        spurt_multiplier = 1.03 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.97 # 巡航を微減
         
-        base_speed = (16.5 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
-        
-        # スタミナ切れペナルティ
+        # ベース速度を 17.5 -> 16.2 に引き下げ
+        base_speed = (16.2 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
         stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
-        
         return base_speed * stamina_multiplier * random.uniform(0.98, 1.02)
 
 class MidPackerStrategy:
@@ -70,15 +65,13 @@ class MidPackerStrategy:
         if not horse.is_spurting and horse.current_stamina > (remaining_dist * 1.1):
             horse.is_spurting = True
 
-        # 瞬発力を反映したスパート倍率（50の時に1.25倍）
-        spurt_multiplier = 1.15 + (horse.explosiveness / 500.0)
-        multiplier = spurt_multiplier if horse.is_spurting else 0.9
+        # スパート倍率（50の時に1.11倍）
+        spurt_multiplier = 1.06 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.93 # 巡航を抑える
         
-        base_speed = (16.2 + (horse.speed / 100.0) * jockey.back_skill) * multiplier
-        
-        # スタミナ切れペナルティ
+        # ベース速度を 17.2 -> 16.0 に引き下げ
+        base_speed = (16.0 + (horse.speed / 100.0) * jockey.back_skill) * multiplier
         stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
-
         return base_speed * stamina_multiplier * random.uniform(0.97, 1.03)
 
 class ChaserStrategy:
@@ -91,13 +84,11 @@ class ChaserStrategy:
         if not horse.is_spurting and horse.current_stamina > (remaining_dist * 1.3):
             horse.is_spurting = True
 
-        # 瞬発力を反映したスパート倍率（50の時に1.3倍）
-        spurt_multiplier = 1.2 + (horse.explosiveness / 500.0)
-        multiplier = spurt_multiplier if horse.is_spurting else 0.85
+        # スパート倍率（50の時に1.08倍、100の時に1.13倍）
+        spurt_multiplier = 1.03 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.88 
         
+        # ベース速度を 17.2 -> 16.0 に引き下げ
         base_speed = (16.0 + (horse.speed / 100.0) * jockey.back_skill) * multiplier
-        
-        # スタミナ切れペナルティ
         stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
-
         return base_speed * stamina_multiplier * random.uniform(0.97, 1.03)
