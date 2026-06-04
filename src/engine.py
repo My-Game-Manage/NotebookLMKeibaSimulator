@@ -42,9 +42,10 @@ class SimulationEngine:
         
             # スタミナ消費ロジック（例: 移動距離分だけスタミナを減らす）
             # 激しく走るほど（速度が速いほど）消費量が増える計算
-            consumption = distance
+            # 移動距離に係数をかけてスタミナを減らす（0.6〜0.8程度に抑える）
+            consumption = distance * 0.7
             if horse.is_spurting:
-                consumption *= 1.5  # スパート中は1.5倍スタミナを消費する
+                consumption *= 1.3  # スパート中は1.5倍スタミナを消費する　→ スパート時の追加負荷を少し軽減（1.5 -> 1.3）
             if horse.current_stamina > 0:
                 horse.current_stamina -= consumption
                 if horse.current_stamina < 0:
