@@ -2,6 +2,7 @@
 物理計算エンジンが正しく馬を進め、ゴール判定を行うかを検証します
 
 - Horseクラスにexplosiveness を追加
+- ドラフティングのテストを追加
 """
 from __future__ import annotations
 import pytest
@@ -37,3 +38,49 @@ def test_engine_rankings_order():
     # 検証: 速い馬が1位（インデックス0）か
     assert engine.rankings[0].name == "速い馬"
     assert engine.rankings[1].name == "遅い馬"
+
+def test_engine_drafting_effect():
+    """ドラフティング圏内（5m以内）にいる馬のスタミナ消費が軽減されるか検証"""
+    jockey = Jockey("テスト騎手", 1.0, 1.0)
+    # 同じ能力の馬を2頭用意
+    leader = Horse("先頭馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    drafter = Horse("追走馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    
+    # 初期位置を設定（差を3.0mにし、ドラフティング圏内に入れる）
+    leader.position = 10.0
+    drafter.position = 7.0
+    
+    engine = SimulationEngine(1600, [leader, drafter], 0.1)
+    
+    # 1ステップ実行前のスタミナ（初期値1000）
+    engine.step()
+    
+    # 消費したスタミナを算出
+    loss_leader = 1000.0 - leader.current_stamina
+    loss_drafter = 1000.0 - drafter.current_stamina
+    
+    # 検証1: ドラフターの方がスタミナ消費が少ないこと
+    assert loss_drafter < loss_leader
+    
+    # 検証2: 軽減率が正確に 0.9倍（10%軽減）であること
+    # 決定論的モデルなので、浮動小数点の近似（pytest.approx）で完全に一致するはずです
+    assert loss_drafter == pytest.approx(loss_leader * 0.9)
+
+def test_engine_no_drafting_outside_range():
+    """5mより離れている場合はドラフティング効果が発生しないことを検証"""
+    jockey = Jockey("テスト", 1.0, 1.0)
+    leader = Horse("先頭馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    far_horse = Horse("離れた馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    
+    # 距離を 6.0m に設定（圏外）
+    leader.position = 10.0
+    far_horse.position = 4.0
+    
+    engine = SimulationEngine(1600, [leader, far_horse], 0.1)
+    engine.step()
+    
+    loss_leader = 1000.0 - leader.current_stamina
+    loss_far = 1000.0 - far_horse.current_stamina
+    
+    # 圏外なので、先頭馬と同じ量だけスタミナを消費するはず
+    assert loss_far == pytest.approx(loss_leader)
