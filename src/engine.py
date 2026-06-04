@@ -41,9 +41,16 @@ class SimulationEngine:
             horse.position += distance
         
             # スタミナ消費ロジック（例: 移動距離分だけスタミナを減らす）
+
+            # --- 決定論的なスタミナ消費の効率化 ---
+            # 騎手スキルの平均をベースに、消費効率を算出（1.0が基準）
+            # スキルの平均値が高いほど、消費係数が下がる（乱数なし）
+            skill_average = (horse.jockey.front_skill + horse.jockey.back_skill) / 2.0
+            efficiency = 1.1 - (skill_average * 0.1)  # スキル1.0なら1.0倍、1.2なら0.98倍
+
             # 激しく走るほど（速度が速いほど）消費量が増える計算
             # 移動距離に係数をかけてスタミナを減らす（0.6〜0.8程度に抑える）
-            consumption = distance * 0.7
+            consumption = distance * 0.7 * efficiency
             if horse.is_spurting:
                 consumption *= 1.3  # スパート中は1.5倍スタミナを消費する　→ スパート時の追加負荷を少し軽減（1.5 -> 1.3）
             if horse.current_stamina > 0:

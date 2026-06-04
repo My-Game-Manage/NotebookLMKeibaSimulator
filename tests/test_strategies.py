@@ -88,26 +88,25 @@ def test_chaser_strategy_phases_with_stamina(setup_data):
     """スタミナの状態によって、追込馬が適切に加速（スパート）することを確認"""
     strategy = ChaserStrategy()
     
-    # スタミナを 500 に設定　→スタミナを 500 から 600 に引き上げる
-    # 400m地点: 残り1200m。500 < (1200 * 1.2) なのでスパートしないはず
-    # 1200m地点（残り400m）で 400 * 1.3 = 520 なので、600あればスパートが発動する
-    # 第4引数に瞬発力 50 を追加
-    horse = Horse("追込馬", 50, 600, 50, strategy, setup_data)
-    
-    # 前半 (400m地点)
-    # 1200 * 1.3 = 1560 なので、600ではスパートしない
+    # スタミナを 600 から 700 に引き上げる
+    # 1200m地点（残り400m）でのしきい値は 400 * (1.3 + 0.2) = 600
+    # 700あれば確実にスパートの条件を満たす
+    horse = Horse("追込馬", 50, 700, 50, strategy, setup_data)
+
+    # 前半 (400m地点) - 残り1200m
+    # しきい値: 1200 * 1.5 = 1800。700ではスパートしない
     horse.position = 400.0
-    horse.is_spurting = False # 初期化
+    horse.is_spurting = False
     speed_cruising = strategy.calculate_step(horse, setup_data, 1600)
     assert horse.is_spurting is False
     
-    # 後半 (1200m地点)
-    # 400 * 1.3 = 520 なので、600あればスパートする
+    # 後半 (1200m地点) - 残り400m
+    # しきい値: 400 * 1.5 = 600。700 > 600 なのでスパートする
     horse.position = 1200.0
     speed_spurt = strategy.calculate_step(horse, setup_data, 1600)
-    assert horse.is_spurting is True
     
-    # 検証: スパート時の方が速い
+    # ここが True になり、テストがパスします
+    assert horse.is_spurting is True
     assert speed_spurt > speed_cruising
 
 def test_runaway_strategy_range(setup_data):
