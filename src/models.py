@@ -4,6 +4,8 @@
 - レース設定に論理的な時間単位（tick_time）を追加し、距離を float で扱えるようにします
 - レース中の残りスタミナを管理する current_stamina プロパティを追加します
 - 馬が現在スパート状態にあるかどうかを保持するフラグ is_spurting を追加します
+- 「瞬発力（explosiveness）」を追加。このパラメータは、0〜100の範囲で馬の「終いの脚の鋭さ」を表現する数値として定義します
+- acceleration を追加し、現在の速度を保持する current_speed フィールドを導入します
 """
 
 from __future__ import annotations
@@ -26,15 +28,20 @@ class Horse:
     name: str
     speed: int
     stamina: int
+    explosiveness: int  # 新規追加：瞬発力（0〜100。スパート時の加速力に影響）
+    acceleration: int  # 新規追加：加速力（0〜100）
     strategy: MoveStrategy
     jockey: Jockey
     position: float = 0.0
     current_stamina: float = 0.0 # レース開始時に stamina の値で初期化する
+    current_speed: float = 0.0  # 新規追加：現在の速度（m/s）
     is_spurting: bool = False  # スパート中かどうかのフラグを追加
 
     def __post_init__(self):
         # インスタンス化の直後に現在のスタミナを最大値に設定
         self.current_stamina = float(self.stamina)
+        # レース開始時は停止状態から始まる
+        self.current_speed = 0.0
 
 @dataclass
 class RaceConfig:

@@ -4,6 +4,7 @@
 - calculate_step が「秒速 (m/s)」を返すように定義を変更します。サラブレッドの平均秒速（約16〜20m/s）を基準にします。
 - 脚質ごとの計算ロジック内で、horse.current_stamina が 0 になった場合に速度を低下させるペナルティを実装します
 - 脚質ごとに、スパートを開始するかどうかの判定ロジックを実装します。ここでは、**「残りスタミナ ≧ 残り距離 × 消費係数」**となったタイミングをスパート開始点とします
+- 「先行（Front-runner）」と「差し（Mid-packer）」の2つの脚質を実装
 """
 from __future__ import annotations
 import random
@@ -18,45 +19,69 @@ class MoveStrategy(Protocol):
     def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float: ...
 
 class RunawayStrategy:
-    """【逃げ】最初から飛ばすが、スタミナ配分を考え最後に再加速を試みる"""
+    """【逃げ】巡航から速いが、スパートの伸びは控えめ"""
     def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
         remaining_dist = course_length - horse.position
+        
+        # 騎手スキルによるスパート判断の固定調整
+        # スキル1.2なら基準の0.7倍地点。スキルが低いほど早仕掛け（残り距離があるうちに開始）になる
+        skill_bonus = 1.2 - jockey.front_skill
+        spurt_threshold = remaining_dist * (0.7 + skill_bonus)
 
-        # 判定：スタミナに余裕があればスパート（逃げは早めに仕掛ける傾向）
-        # 消費係数を1.0と仮定し、残り距離をカバーできるならスパート開始
-        # スパート判定（逃げは少し早め）
-        if not horse.is_spurting and horse.current_stamina > (remaining_dist * 0.7):
+        if not horse.is_spurting and horse.current_stamina > spurt_threshold:
             horse.is_spurting = True
+
+        spurt_multiplier = 0.98 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 1.0
         
-        # ベース速度の計算
-        # 巡航時は少し抑え、スパート時に本来の能力を出す設定
-        # 巡航時も 1.0倍（減速させない）とし、スパートで 1.1倍に加速
-        # ベース速度を 16.5 前後に設定
-        speed_rate = 1.1 if horse.is_spurting else 1.0
-        base_speed = (16.5 + (horse.speed / 100.0) * jockey.front_skill) * speed_rate
-        
-        # スタミナ切れペナルティ（スタミナ0なら速度60%に低下）
+        base_speed = (16.2 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
         stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
+        return base_speed * stamina_multiplier
+
+class FrontRunnerStrategy:
+    """【先行】バランス重視。スキルが高いほど理想的なスパート地点を維持"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
+        remaining_dist = course_length - horse.position
+        skill_bonus = 1.2 - jockey.front_skill
+        spurt_threshold = remaining_dist * (0.9 + skill_bonus)
+
+        if not horse.is_spurting and horse.current_stamina > spurt_threshold:
+            horse.is_spurting = True
+
+        spurt_multiplier = 1.03 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.97
         
-        return base_speed * stamina_multiplier * random.uniform(0.99, 1.01)
+        base_speed = (16.2 + (horse.speed / 100.0) * jockey.front_skill) * multiplier
+        return base_speed * (1.0 if horse.current_stamina > 0 else 0.6)
+
+class MidPackerStrategy:
+    """【差し】後半の鋭さを騎手スキルで制御"""
+    def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
+        remaining_dist = course_length - horse.position
+        skill_bonus = 1.2 - jockey.back_skill
+        spurt_threshold = remaining_dist * (1.1 + skill_bonus)
+
+        if not horse.is_spurting and horse.current_stamina > spurt_threshold:
+            horse.is_spurting = True
+
+        spurt_multiplier = 1.06 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.93
+        
+        base_speed = (16.0 + (horse.speed / 100.0) * jockey.back_skill) * multiplier
+        return base_speed * (1.0 if horse.current_stamina > 0 else 0.6)
 
 class ChaserStrategy:
-    """【追い込み】道中は足を溜め、ゴールまで走りきれる計算が立ったら一気に加速する"""
+    """【追い込み】名手ほどギリギリまでスパートを我慢し、鋭い脚を温存する"""
     def calculate_step(self, horse: Horse, jockey: Jockey, course_length: int) -> float:
         remaining_dist = course_length - horse.position
+        skill_bonus = 1.2 - jockey.back_skill
+        spurt_threshold = remaining_dist * (1.3 + skill_bonus)
 
-        # 判定：追い込みはギリギリまで溜める（消費係数を1.2とし、確実なタイミングでスパート）
-        # スパート判定：追い込みはギリギリまで溜める（スタミナが残り距離の1.3倍以上必要）
-        if not horse.is_spurting and horse.current_stamina > (remaining_dist * 1.3):
+        if not horse.is_spurting and horse.current_stamina > spurt_threshold:
             horse.is_spurting = True
 
-        # 倍率の設定：
-        # 巡航時は 0.85倍まで抑え、スパートで 1.3倍まで一気に上げる
-        # ベース速度は逃げよりわずかに低めの 16.0
-        multiplier = 1.3 if horse.is_spurting else 0.85
-        base_speed = 16.0 * multiplier * jockey.back_skill
-
-        # スタミナ切れペナルティ
-        stamina_multiplier = 1.0 if horse.current_stamina > 0 else 0.6
+        spurt_multiplier = 1.03 + (horse.explosiveness / 1000.0)
+        multiplier = spurt_multiplier if horse.is_spurting else 0.88 
         
-        return base_speed * stamina_multiplier * random.uniform(0.97, 1.03)
+        base_speed = (16.0 + (horse.speed / 100.0) * jockey.back_skill) * multiplier
+        return base_speed * (1.0 if horse.current_stamina > 0 else 0.6)

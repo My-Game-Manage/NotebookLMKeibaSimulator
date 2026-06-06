@@ -1,0 +1,21 @@
+これは私がPythonで開発している競馬シミュレータのソースコード（クラス定義や物理演算ロジック）のファイル構成です。
+全体の構造の把握や、今後のリファクタリング、機能追加の相談のためにアップロードしています。
+
+
+1. ディレクトリ構造の定義
+
+project_root/
+│
+├─ main.py           # エントリーポイント（DIコンテナの役割も兼ねる）
+├─ src/
+├── models.py         # ドメインモデル定義（Jockey, Horse, RaceConfig）
+├── strategies.py     # 脚質・移動戦略の実装（MoveStrategy Protocol）
+├── engine.py         # シミュレーション物理計算エンジン
+├── observers.py      # 通信インターフェース定義（RaceObserver Protocol）
+├── view.py           # 表示処理（ConsoleViewの実装）
+├── race.py           # レース・ライフサイクル管理（Raceクラス）
+├─ tests/
+├── test_engine.py    # テスト（engine） 
+├── test_models.py    # テスト（Horse）
+├── test_race.py      # テスト（Race）
+└── test_view.py      # テスト（view）
