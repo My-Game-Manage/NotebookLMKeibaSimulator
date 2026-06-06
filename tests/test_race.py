@@ -30,8 +30,8 @@ class MockObserver:
 def test_race_lifecycle_with_rankings():
     config = RaceConfig(course_length=10, interval=0.01)
     jockey = Jockey("テスト", 1.0, 1.0)
-    # 第4引数に 50 を追加
-    horses = [Horse("馬1", 100, 100, 50, RunawayStrategy(), jockey)]
+    # 第5引数に 50 を追加
+    horses = [Horse("馬1", 100, 100, 50, 50, RunawayStrategy(), jockey)]
     
     race = Race(config, horses)
     observer = MockObserver()

@@ -5,6 +5,7 @@
 - エンジン側で、ゴールした馬を順番に記録する rankings リストを管理するようにします
 - 移動距離に応じてスタミナを減算する処理を追加します
 - スパート中はスタミナ消費を激しくすることで、より戦略的なシミュレーションになります
+- trategy.calculate_step が返す速度を 「目標速度」 とみなし、acceleration に基づいて current_speed を段階的に近づけます
 """
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
@@ -28,13 +29,26 @@ class SimulationEngine:
         active_horses = [h for h in self.horses if h not in self.rankings]
         sorted_horses = sorted(active_horses, key=lambda x: x.position, reverse=True)
         
-        # このステップで新しくゴールした馬を判定するためのリスト
-        #newly_finished: List[Horse] = []
-
         for i, horse in enumerate(sorted_horses):
             # 速度計算（strategies.py の決定論的ロジックを呼び出し）
-            speed = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
-            distance = speed * self.tick_time
+            # 1. 戦略クラスから「現在の状態での目標速度」を取得
+            target_speed = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
+
+            # 2. 加速力による速度更新（決定論的）
+            # acceleration 0-100 を 加速度 0.5〜1.5 m/s^2 程度にマッピング
+            accel_val = 0.5 + (horse.acceleration / 100.0)
+
+            speed_diff = target_speed - horse.current_speed
+            
+            if speed_diff > 0:
+                # 加速：目標速度を超えない範囲で加速
+                horse.current_speed += min(speed_diff, accel_val * self.tick_time)
+            elif speed_diff < 0:
+                # 減速（スタミナ切れ等）：目標速度まで減速
+                horse.current_speed += max(speed_diff, -accel_val * self.tick_time)
+
+            # 3. 更新された現在速度で移動
+            distance = horse.current_speed * self.tick_time
             horse.position += distance
 
             # --- 2. ドラフティング（スリップストリーム）判定 ---

@@ -12,20 +12,19 @@ from src.strategies import RunawayStrategy
 
 def test_engine_step_advances_horse():
     jockey = Jockey("テスト", 1.0, 1.0)
-    # 第4引数に 50 を追加
-    horse = Horse("馬", 10, 100, 50, RunawayStrategy(), jockey)
+    # 第5引数に 50 を追加
+    horse = Horse("馬", 10, 100, 50, 50, RunawayStrategy(), jockey)
     engine = SimulationEngine(100, [horse], 0.1)
-    
-    initial_pos = horse.position
+    # 最初のステップでは 0m/s から加速するため、移動距離は以前より短くなることに注意
     engine.step()
-    assert horse.position > initial_pos
+    assert horse.position > 0
 
 def test_engine_rankings_order():
     jockey = Jockey("テスト", 1.0, 1.0)
     # 足の速い馬と遅い馬を用意
-    # 第4引数に 50 を追加
-    fast_horse = Horse("速い馬", 100, 100, 50, RunawayStrategy(), jockey)
-    slow_horse = Horse("遅い馬", 10, 100, 50, RunawayStrategy(), jockey)
+    # 全ての馬の生成に第5引数 50 を追加
+    fast_horse = Horse("速い馬", 100, 100, 50, 50, RunawayStrategy(), jockey)
+    slow_horse = Horse("遅い馬", 10, 100, 50, 50, RunawayStrategy(), jockey)
     
     engine = SimulationEngine(100, [fast_horse, slow_horse], 0.1)
     
@@ -43,8 +42,9 @@ def test_engine_drafting_effect():
     """ドラフティング圏内（5m以内）にいる馬のスタミナ消費が軽減されるか検証"""
     jockey = Jockey("テスト騎手", 1.0, 1.0)
     # 同じ能力の馬を2頭用意
-    leader = Horse("先頭馬", 50, 1000, 50, RunawayStrategy(), jockey)
-    drafter = Horse("追走馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    # 全ての馬の生成に第5引数 50 を追加
+    leader = Horse("先頭馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    drafter = Horse("追走馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
     
     # 初期位置を設定（差を3.0mにし、ドラフティング圏内に入れる）
     leader.position = 10.0
@@ -69,8 +69,9 @@ def test_engine_drafting_effect():
 def test_engine_no_drafting_outside_range():
     """5mより離れている場合はドラフティング効果が発生しないことを検証"""
     jockey = Jockey("テスト", 1.0, 1.0)
-    leader = Horse("先頭馬", 50, 1000, 50, RunawayStrategy(), jockey)
-    far_horse = Horse("離れた馬", 50, 1000, 50, RunawayStrategy(), jockey)
+    # 全ての馬の生成に第5引数 50 を追加
+    leader = Horse("先頭馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    far_horse = Horse("離れた馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
     
     # 距離を 6.0m に設定（圏外）
     leader.position = 10.0
