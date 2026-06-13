@@ -8,6 +8,7 @@
 - acceleration を追加し、現在の速度を保持する current_speed フィールドを導入します
 - Corner クラス を追加し、RaceConfig でそれらを保持できるように拡張
 - RaceConfig にtrack_condition（馬場状態）を追加します
+- Horse に powerを追加
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ class Horse:
     stamina: int
     explosiveness: int  # 新規追加：瞬発力（0〜100。スパート時の加速力に影響）
     acceleration: int  # 新規追加：加速力（0〜100）
+    power: int  # 新規追加：パワー（0〜100。坂や重馬場での抵抗力に影響）
     strategy: MoveStrategy
     jockey: Jockey
     position: float = 0.0

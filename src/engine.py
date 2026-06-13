@@ -83,8 +83,13 @@ class SimulationEngine:
 
             # --- 5. スタミナ消費計算（決定論的） [1, 9, 会話履歴] ---
             # --- 馬場状態による係数の設定 ---
+            # ループの中で、現在処理している horse の power を参照する
             # "重" の場合はスタミナ消費を 20% 増加させる (1.2倍)
-            track_multiplier = 1.2 if self.track_condition == "重" else 1.0
+            if self.track_condition == "重":
+                # パワー100なら1.1倍、パワー0なら1.2倍になる決定論的ロジック
+                track_multiplier = 1.2 - (horse.power / 100.0 * 0.1)
+            else:
+                track_multiplier = 1.0
 
             # --- スタミナ消費計算（決定論的） ---
             # 騎手スキルの平均による効率化 [1, 会話履歴]
@@ -93,6 +98,7 @@ class SimulationEngine:
 
             # 消費 = (基本消費 + コーナー負荷) * 騎手効率 * ドラフティング * スパート補正 * 馬場補正
             # 基本消費: 距離 * 0.7 [1, 会話履歴]
+            # track_multiplier が個別の馬の power を反映しているため、差が出るようになります
             base_consumption = (distance * 0.7) + corner_stamina_load
             spurt_multiplier = 1.3 if horse.is_spurting else 1.0
 

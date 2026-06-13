@@ -3,6 +3,7 @@
 
 - Horseクラスにexplosiveness を追加
 - ドラフティングのテストを追加
+- Horseにpowerを追加
 """
 from __future__ import annotations
 import pytest
@@ -13,7 +14,8 @@ from src.strategies import RunawayStrategy
 def test_engine_step_advances_horse():
     jockey = Jockey("テスト", 1.0, 1.0)
     # 第5引数に 50 を追加
-    horse = Horse("馬", 10, 100, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    horse = Horse("馬", 10, 100, 50, 50, 50, RunawayStrategy(), jockey)
     engine = SimulationEngine(100, [horse], 0.1)
     # 最初のステップでは 0m/s から加速するため、移動距離は以前より短くなることに注意
     engine.step()
@@ -23,8 +25,9 @@ def test_engine_rankings_order():
     jockey = Jockey("テスト", 1.0, 1.0)
     # 足の速い馬と遅い馬を用意
     # 全ての馬の生成に第5引数 50 を追加
-    fast_horse = Horse("速い馬", 100, 100, 50, 50, RunawayStrategy(), jockey)
-    slow_horse = Horse("遅い馬", 10, 100, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    fast_horse = Horse("速い馬", 100, 100, 50, 50, 50, RunawayStrategy(), jockey)
+    slow_horse = Horse("遅い馬", 10, 100, 50, 50, 50, RunawayStrategy(), jockey)
     
     engine = SimulationEngine(100, [fast_horse, slow_horse], 0.1)
     
@@ -43,8 +46,9 @@ def test_engine_drafting_effect():
     jockey = Jockey("テスト騎手", 1.0, 1.0)
     # 同じ能力の馬を2頭用意
     # 全ての馬の生成に第5引数 50 を追加
-    leader = Horse("先頭馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
-    drafter = Horse("追走馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    leader = Horse("先頭馬", 50, 1000, 50, 50, 50, RunawayStrategy(), jockey)
+    drafter = Horse("追走馬", 50, 1000, 50, 50, 50, RunawayStrategy(), jockey)
     
     # 初期位置を設定（差を3.0mにし、ドラフティング圏内に入れる）
     leader.position = 10.0
@@ -70,8 +74,9 @@ def test_engine_no_drafting_outside_range():
     """5mより離れている場合はドラフティング効果が発生しないことを検証"""
     jockey = Jockey("テスト", 1.0, 1.0)
     # 全ての馬の生成に第5引数 50 を追加
-    leader = Horse("先頭馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
-    far_horse = Horse("離れた馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    leader = Horse("先頭馬", 50, 1000, 50, 50, 50, RunawayStrategy(), jockey)
+    far_horse = Horse("離れた馬", 50, 1000, 50, 50, 50, RunawayStrategy(), jockey)
     
     # 距離を 6.0m に設定（圏外）
     leader.position = 10.0
@@ -90,8 +95,8 @@ def test_engine_corner_velocity_limit():
     """コーナーの半径による速度制限が決定論的に適用されるか検証"""
     jockey = Jockey("テスト", 1.0, 1.0)
     # 非常に速いスピードを持つ馬（制限にかかりやすく設定）
-    # Horse(name, speed, stamina, explosiveness, acceleration, strategy, jockey)
-    horse = Horse("高速馬", 100, 1000, 50, 100, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    horse = Horse("高速馬", 100, 1000, 50, 100, 50, RunawayStrategy(), jockey)
 
     # 1. 半径100mのコーナーを定義
     # 制限速度 V_limit = 2.0 * sqrt(100) = 20.0 m/s [会話履歴]
@@ -114,7 +119,8 @@ def test_engine_corner_velocity_limit():
 def test_engine_corner_stamina_additional_load():
     """コーナー走行時に遠心力によるスタミナ追加負荷が発生するか検証"""
     jockey = Jockey("テスト", 1.0, 1.0)
-    horse = Horse("検証馬", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    horse = Horse("検証馬", 50, 1000, 50, 50, 50, RunawayStrategy(), jockey)
     
     # 同一速度、同一距離での「直線」と「コーナー」のスタミナ消費を比較
     # A. 直線走行
@@ -142,8 +148,9 @@ def test_engine_track_condition_stamina_consumption():
     jockey = Jockey("テスト騎手", 1.0, 1.0)
     
     # 比較用に同じ能力の馬を準備
-    horse_firm = Horse("良馬場用", 50, 1000, 50, 50, RunawayStrategy(), jockey)
-    horse_heavy = Horse("重馬場用", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    horse_firm = Horse("良馬場用", 50, 1000, 50, 50, 0, RunawayStrategy(), jockey)
+    horse_heavy = Horse("重馬場用", 50, 1000, 50, 50, 0, RunawayStrategy(), jockey)
 
     # 1. 「良」馬場での1ステップ走行
     # コンストラクタに track_condition="良" を渡す（v0.1.5想定）
@@ -165,7 +172,8 @@ def test_engine_heavy_track_stamina_exhaustion_timing():
     """重馬場においてスタミナ切れが早く発生することを検証"""
     jockey = Jockey("テスト", 1.0, 1.0)
     # スタミナを極端に低く設定した馬
-    horse = Horse("スタミナ不安馬", 50, 50, 50, 50, RunawayStrategy(), jockey)
+    # 第6引数に power=50 を追加
+    horse = Horse("スタミナ不安馬", 50, 50, 50, 50, 50, RunawayStrategy(), jockey)
     
     # 重馬場設定でシミュレーションを実行
     engine = SimulationEngine(1600, [horse], 0.1, corners=[], track_condition="重")
@@ -178,3 +186,23 @@ def test_engine_heavy_track_stamina_exhaustion_timing():
     # 良馬場（通常 0.7係数）よりも激しく減っていることを確認
     # 期待される消費: distance * 0.7 * 1.2 * jockey_efficiency ...
     assert horse.current_stamina < initial_stamina
+
+# パワーによる重馬場適性の検証テスト（新規追加）
+def test_engine_power_mitigates_heavy_track_load():
+    """パワーが高いほど重馬場でのスタミナ消費が軽減されるか検証"""
+    jockey = Jockey("テスト", 1.0, 1.0)
+    # パワーの異なる2頭を用意
+    high_power_horse = Horse("パワー型", 50, 1000, 50, 50, 100, RunawayStrategy(), jockey)
+    low_power_horse = Horse("非力型", 50, 1000, 50, 50, 0, RunawayStrategy(), jockey)
+
+    # 重馬場で1ステップ走行
+    engine_h = SimulationEngine(1600, [high_power_horse], 0.1, track_condition="重")
+    engine_l = SimulationEngine(1600, [low_power_horse], 0.1, track_condition="重")
+    
+    engine_h.step()
+    engine_l.step()
+
+    # 消費倍率の差：パワー100(1.1倍) < パワー0(1.2倍) となるはず [会話履歴]
+    loss_h = 1000.0 - high_power_horse.current_stamina
+    loss_l = 1000.0 - low_power_horse.current_stamina
+    assert loss_h < loss_l

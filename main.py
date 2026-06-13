@@ -50,6 +50,7 @@ def main():
             name="サイレンス逃げ", 
             speed=75, stamina=1100, explosiveness=40,  # 逃げは粘り重視
             acceleration=90,  # 逃げ馬はスタートダッシュのために加速力を高く設定
+            power=30,
             strategy=RunawayStrategy(), 
             jockey=jockey_a
         ),
@@ -57,6 +58,7 @@ def main():
             name="テイオー先行", 
             speed=70, stamina=1250, explosiveness=60,
             acceleration=70,  # 先行馬も加速力を高めに設定
+            power=60,
             strategy=FrontRunnerStrategy(), 
             jockey=jockey_b
         ),
@@ -64,6 +66,7 @@ def main():
             name="オグリ差し", 
             speed=68, stamina=1350, explosiveness=85,  # 差し・追込は瞬発力を高く
             acceleration=60,  # 差し馬は序盤は標準
+            power=70,
             strategy=MidPackerStrategy(), 
             jockey=jockey_c
         ),
@@ -71,6 +74,7 @@ def main():
             name="ゴルシ追込", 
             speed=65, stamina=1500, explosiveness=95, 
             acceleration=40,  # 追込馬は序盤はゆっくり、後半の加速もじわじわと
+            power=95,
             strategy=ChaserStrategy(), 
             jockey=jockey_c
         ),

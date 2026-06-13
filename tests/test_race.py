@@ -2,6 +2,7 @@
 レースの進行管理と Observer への通知が正しく機能するかを検証します
 
 - Horseクラスにexplosiveness を追加
+- Horseにpowerを追加
 """
 from __future__ import annotations
 import pytest
@@ -31,7 +32,8 @@ def test_race_lifecycle_with_rankings():
     config = RaceConfig(course_length=10, interval=0.01)
     jockey = Jockey("テスト", 1.0, 1.0)
     # 第5引数に 50 を追加
-    horses = [Horse("馬1", 100, 100, 50, 50, RunawayStrategy(), jockey)]
+    # 第6引数に 50 を追加
+    horses = [Horse("馬1", 100, 100, 50, 50, 50, RunawayStrategy(), jockey)]
     
     race = Race(config, horses)
     observer = MockObserver()
