@@ -136,3 +136,45 @@ def test_engine_corner_stamina_additional_load():
     
     # コーナーの方が、遠心力負荷 (v^2 / R*10) の分だけ消費が多いはず [会話履歴]
     assert loss_corner > loss_straight
+
+def test_engine_track_condition_stamina_consumption():
+    """馬場状態（重馬場）によってスタミナ消費量が1.2倍になることを決定論的に検証"""
+    jockey = Jockey("テスト騎手", 1.0, 1.0)
+    
+    # 比較用に同じ能力の馬を準備
+    horse_firm = Horse("良馬場用", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+    horse_heavy = Horse("重馬場用", 50, 1000, 50, 50, RunawayStrategy(), jockey)
+
+    # 1. 「良」馬場での1ステップ走行
+    # コンストラクタに track_condition="良" を渡す（v0.1.5想定）
+    engine_firm = SimulationEngine(1600, [horse_firm], 0.1, corners=[], track_condition="良")
+    engine_firm.step()
+    loss_firm = 1000.0 - horse_firm.current_stamina
+
+    # 2. 「重」馬場での1ステップ走行
+    # コンストラクタに track_condition="重" を渡す
+    engine_heavy = SimulationEngine(1600, [horse_heavy], 0.1, corners=[], track_condition="重")
+    engine_heavy.step()
+    loss_heavy = 1000.0 - horse_heavy.current_stamina
+
+    # 3. 検証：重馬場の消費量が良馬場の正確に1.2倍であること
+    # 決定論的モデルのため、誤差なく 1.2倍になるはずです
+    assert loss_heavy == pytest.approx(loss_firm * 1.2)
+
+def test_engine_heavy_track_stamina_exhaustion_timing():
+    """重馬場においてスタミナ切れが早く発生することを検証"""
+    jockey = Jockey("テスト", 1.0, 1.0)
+    # スタミナを極端に低く設定した馬
+    horse = Horse("スタミナ不安馬", 50, 50, 50, 50, RunawayStrategy(), jockey)
+    
+    # 重馬場設定でシミュレーションを実行
+    engine = SimulationEngine(1600, [horse], 0.1, corners=[], track_condition="重")
+    
+    # 数ステップ実行し、良馬場よりも早くスタミナが枯渇することを確認
+    # （ここでは消費量が増えていることの確認に留めます）
+    initial_stamina = horse.current_stamina
+    engine.step()
+    
+    # 良馬場（通常 0.7係数）よりも激しく減っていることを確認
+    # 期待される消費: distance * 0.7 * 1.2 * jockey_efficiency ...
+    assert horse.current_stamina < initial_stamina

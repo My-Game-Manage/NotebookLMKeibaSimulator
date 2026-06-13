@@ -28,11 +28,13 @@ def main():
 
     # 2. レース設定（コーナーリストを注入）
     # 決定論的モデルに基づき、これらの値は全馬に一律の物理制約として作用します
+    # 馬場状態で「重」を設定した場合
     config = RaceConfig(
         course_length=1600, 
         tick_time=0.1, 
         interval=0.01,
-        corners=corners
+        corners=corners,
+        track_condition="重"  # ここで馬場状態を変更
     )
 
     # 3. 騎手の作成（脚質への適正を考慮して配置） [2]

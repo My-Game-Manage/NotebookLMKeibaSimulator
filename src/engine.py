@@ -6,6 +6,7 @@
 - 移動距離に応じてスタミナを減算する処理を追加します
 - スパート中はスタミナ消費を激しくすることで、より戦略的なシミュレーションになります
 - trategy.calculate_step が返す速度を 「目標速度」 とみなし、acceleration に基づいて current_speed を段階的に近づけます
+- step メソッド内で、馬場状態に応じたスタミナ消費倍率を適用します
 """
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
@@ -15,11 +16,12 @@ if TYPE_CHECKING:
 
 class SimulationEngine:
     def __init__(self, course_length: int, horses: List[Horse], tick_time: float,
-                 corners: list[Corner] = None):
+                 corners: list[Corner] = None, track_condition: str = "良"):
         self.course_length = course_length
         self.horses = horses
         self.tick_time = tick_time
         self.corners = corners or [] # RaceConfigから渡されるコーナーリスト
+        self.track_condition = track_condition  # 馬場状態を保持
         self.elapsed_time = 0.0
         self.rankings: List[Horse] = []
 
@@ -80,18 +82,28 @@ class SimulationEngine:
                     drafting_multiplier = 0.9  # スタミナ消費を10%軽減
 
             # --- 5. スタミナ消費計算（決定論的） [1, 9, 会話履歴] ---
-            # 騎手スキルの平均による効率化（1.0が基準）
+            # --- 馬場状態による係数の設定 ---
+            # "重" の場合はスタミナ消費を 20% 増加させる (1.2倍)
+            track_multiplier = 1.2 if self.track_condition == "重" else 1.0
+
+            # --- スタミナ消費計算（決定論的） ---
+            # 騎手スキルの平均による効率化 [1, 会話履歴]
             skill_average = (horse.jockey.front_skill + horse.jockey.back_skill) / 2.0
             jockey_efficiency = 1.1 - (skill_average * 0.1) 
-            
-            # 消費量 = 移動距離 * 基準係数 * 騎手効率 * ドラフティング補正
-            # 消費 = (基本消費 + コーナー負荷) * 騎手効率 * ドラフティング * スパート補正
+
+            # 消費 = (基本消費 + コーナー負荷) * 騎手効率 * ドラフティング * スパート補正 * 馬場補正
+            # 基本消費: 距離 * 0.7 [1, 会話履歴]
             base_consumption = (distance * 0.7) + corner_stamina_load
             spurt_multiplier = 1.3 if horse.is_spurting else 1.0
-            
-            consumption = base_consumption * jockey_efficiency * drafting_multiplier * spurt_multiplier
 
-            horse.current_stamina -= consumption
+            # 最終的なスタミナ減算
+            horse.current_stamina -= (
+                base_consumption * 
+                jockey_efficiency * 
+                drafting_multiplier * 
+                spurt_multiplier * 
+                track_multiplier  # 馬場状態の影響を乗算
+            )
 
             # ゴール判定
             if horse.position >= self.course_length:

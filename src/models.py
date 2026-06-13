@@ -7,6 +7,7 @@
 - 「瞬発力（explosiveness）」を追加。このパラメータは、0〜100の範囲で馬の「終いの脚の鋭さ」を表現する数値として定義します
 - acceleration を追加し、現在の速度を保持する current_speed フィールドを導入します
 - Corner クラス を追加し、RaceConfig でそれらを保持できるように拡張
+- RaceConfig にtrack_condition（馬場状態）を追加します
 """
 
 from __future__ import annotations
@@ -57,5 +58,6 @@ class RaceConfig:
     course_length: int = 1600  # 100mから1600mへ拡張 [3]
     tick_time: float = 0.1     # 1ステップあたりの論理時間（秒）
     interval: float = 0.01     # 実際の表示更新間隔（秒）
-    # 決定論的なコース形状を定義するため、コーナーのリストを追加 [3]
-    corners: List[Corner] = field(default_factory=list) 
+    corners: List[Corner] = field(default_factory=list)     # 決定論的なコース形状を定義するため、コーナーのリストを追加 [3]
+    # 新規追加：馬場状態 ("良" または "重")
+    track_condition: str = "良"

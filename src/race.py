@@ -24,7 +24,8 @@ class Race:
             config.course_length, 
             horses, 
             config.tick_time,
-            config.corners  # 第4引数として追加
+            config.corners,  # 第4引数として追加
+            config.track_condition  # 第5引数として馬場状態を渡す
         )
         self.winner: Optional[Horse] = None
         self._observers: List[RaceObserver] = []
