@@ -18,7 +18,14 @@ class Race:
     def __init__(self, config: RaceConfig, horses: List[Horse]):
         self.config = config
         self.horses = horses
-        self.engine = SimulationEngine(config.course_length, horses, config.tick_time)
+        # --- 修正箇所: config.corners を SimulationEngine に渡す ---
+        # これにより、エンジン内の step メソッドでコーナー判定が可能になります
+        self.engine = SimulationEngine(
+            config.course_length, 
+            horses, 
+            config.tick_time,
+            config.corners  # 第4引数として追加
+        )
         self.winner: Optional[Horse] = None
         self._observers: List[RaceObserver] = []
 

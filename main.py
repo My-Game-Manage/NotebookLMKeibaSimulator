@@ -7,7 +7,7 @@
 - 各馬の個性を出すために、acceleration を設定
 """
 from __future__ import annotations
-from src.models import Jockey, Horse, RaceConfig
+from src.models import Jockey, Horse, RaceConfig, Corner  # Corner を追加
 from src.strategies import (
     RunawayStrategy, 
     FrontRunnerStrategy, 
@@ -18,10 +18,24 @@ from src.race import Race
 from src.view import ConsoleView
 
 def main():
-    # 1. レース設定（1600m、計算精度0.1秒、表示間隔0.01秒） [1, 3]
-    config = RaceConfig(course_length=1600, tick_time=0.1, interval=0.01)
+    # 1. コース形状（コーナー）の定義
+    # start_pos: 開始地点(m), end_pos: 終了地点(m), radius: 半径(m)
+    # 半径が小さいほど急カーブとなり、減速効果が強まります
+    corners = [
+        Corner(start_pos=400.0, end_pos=600.0, radius=150.0),   # 第3コーナー
+        Corner(start_pos=600.0, end_pos=1000.0, radius=120.0)  # 第4コーナー（やや急）
+    ]
 
-    # 2. 騎手の作成（脚質への適正を考慮して配置） [2]
+    # 2. レース設定（コーナーリストを注入）
+    # 決定論的モデルに基づき、これらの値は全馬に一律の物理制約として作用します
+    config = RaceConfig(
+        course_length=1600, 
+        tick_time=0.1, 
+        interval=0.01,
+        corners=corners
+    )
+
+    # 3. 騎手の作成（脚質への適正を考慮して配置） [2]
     jockey_a = Jockey("山田騎手", front_skill=1.2, back_skill=0.8)
     jockey_b = Jockey("佐藤騎手", front_skill=1.0, back_skill=1.0)
     jockey_c = Jockey("田中騎手", front_skill=0.8, back_skill=1.2)
@@ -32,29 +46,29 @@ def main():
     horses = [
         Horse(
             name="サイレンス逃げ", 
-            speed=75, stamina=1150, explosiveness=40,  # 逃げは粘り重視
+            speed=75, stamina=1100, explosiveness=40,  # 逃げは粘り重視
             acceleration=90,  # 逃げ馬はスタートダッシュのために加速力を高く設定
             strategy=RunawayStrategy(), 
             jockey=jockey_a
         ),
         Horse(
             name="テイオー先行", 
-            speed=70, stamina=1300, explosiveness=60,
-            acceleration=75,  # 先行馬も加速力を高めに設定
+            speed=70, stamina=1250, explosiveness=60,
+            acceleration=70,  # 先行馬も加速力を高めに設定
             strategy=FrontRunnerStrategy(), 
             jockey=jockey_b
         ),
         Horse(
             name="オグリ差し", 
-            speed=65, stamina=1400, explosiveness=80,  # 差し・追込は瞬発力を高く
-            acceleration=50,  # 差し馬は序盤は標準
+            speed=68, stamina=1350, explosiveness=85,  # 差し・追込は瞬発力を高く
+            acceleration=60,  # 差し馬は序盤は標準
             strategy=MidPackerStrategy(), 
             jockey=jockey_c
         ),
         Horse(
             name="ゴルシ追込", 
-            speed=60, stamina=1550, explosiveness=90, 
-            acceleration=30,  # 追込馬は序盤はゆっくり、後半の加速もじわじわと
+            speed=65, stamina=1500, explosiveness=95, 
+            acceleration=40,  # 追込馬は序盤はゆっくり、後半の加速もじわじわと
             strategy=ChaserStrategy(), 
             jockey=jockey_c
         ),
