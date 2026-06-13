@@ -3,6 +3,7 @@
 
 - Horseクラスにexplosiveness を追加
 - 瞬発力に基づいた上がり3Fタイムを検証するテスト を追加
+- Horseにpowerを追加
 """
 from __future__ import annotations
 import pytest
@@ -21,11 +22,12 @@ def test_runaway_strategy_stamina_penalty(setup_data):
     
     # 条件を揃えるため、両方ともスパート状態にする
     # 第5引数に acceleration=50 を追加
-    horse_ok = Horse("元気な逃げ馬", 50, 2000, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse_ok = Horse("元気な逃げ馬", 50, 2000, 50, 50, 50, strategy, setup_data)
     horse_ok.is_spurting = True
     speed_ok = strategy.calculate_step(horse_ok, setup_data, 1600)
     
-    horse_tired = Horse("バテた逃げ馬", 50, 2000, 50, 50, strategy, setup_data)
+    horse_tired = Horse("バテた逃げ馬", 50, 2000, 50, 50, 50, strategy, setup_data)
     horse_tired.is_spurting = True
     horse_tired.current_stamina = 0.0
     speed_tired = strategy.calculate_step(horse_tired, setup_data, 1600)
@@ -40,7 +42,8 @@ def test_front_runner_strategy_phases(setup_data):
     strategy = FrontRunnerStrategy()
     # 400m地点(残り1200m)でスタミナ1000：1200 * 0.9 = 1080 なのでスパートしない
     # 第5引数に acceleration=50 を追加
-    horse = Horse("先行馬", 50, 1000, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse = Horse("先行馬", 50, 1000, 50, 50, 50, strategy, setup_data)
     horse.position = 400.0
     strategy.calculate_step(horse, setup_data, 1600)
     assert horse.is_spurting is False
@@ -55,7 +58,8 @@ def test_mid_packer_strategy_phases(setup_data):
     strategy = MidPackerStrategy()
     # 800m地点(残り800m)でスタミナ800：800 * 1.1 = 880 なのでスパートしない
     # 第5引数に acceleration=50 を追加
-    horse = Horse("差し馬", 50, 800, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse = Horse("差し馬", 50, 800, 50, 50, 50, strategy, setup_data)
     horse.position = 800.0
     strategy.calculate_step(horse, setup_data, 1600)
     assert horse.is_spurting is False
@@ -71,12 +75,14 @@ def test_chaser_strategy_stamina_penalty(setup_data):
     
     # 条件を揃えるため、スパート中の状態で比較
     # 第5引数に acceleration=50 を追加
-    horse_ok = Horse("元気な追込馬", 50, 2000, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse_ok = Horse("元気な追込馬", 50, 2000, 50, 50, 50, strategy, setup_data)
     horse_ok.is_spurting = True
     speed_ok = strategy.calculate_step(horse_ok, setup_data, 1600)
     
     # 第5引数に acceleration=50 を追加
-    horse_tired = Horse("バテた追込馬", 50, 2000, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse_tired = Horse("バテた追込馬", 50, 2000, 50, 50, 50, strategy, setup_data)
     horse_tired.is_spurting = True
     horse_tired.current_stamina = 0.0
     speed_tired = strategy.calculate_step(horse_tired, setup_data, 1600)
@@ -92,7 +98,8 @@ def test_chaser_strategy_phases_with_stamina(setup_data):
     # 1200m地点（残り400m）でのしきい値は 400 * (1.3 + 0.2) = 600
     # 700あれば確実にスパートの条件を満たす
     # 第5引数に acceleration=50 を追加
-    horse = Horse("追込馬", 50, 700, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse = Horse("追込馬", 50, 700, 50, 50, 50, strategy, setup_data)
 
     # 前半 (400m地点) - 残り1200m
     # しきい値: 1200 * 1.5 = 1800。700ではスパートしない
@@ -115,7 +122,8 @@ def test_runaway_strategy_range(setup_data):
     strategy = RunawayStrategy()
     # スタミナを低く設定して巡航速度（0.95倍）をテストする場合
     # 第5引数に acceleration=50 を追加
-    horse = Horse("逃げ", 50, 100, 50, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    horse = Horse("逃げ", 50, 100, 50, 50, 50, strategy, setup_data)
     # 巡航速度の状態を確認
     horse.is_spurting = False
     speed = strategy.calculate_step(horse, setup_data, 1600)
@@ -130,8 +138,9 @@ def test_agari_3f_by_explosiveness(setup_data):
     # 1. 瞬発力が高い馬 (100) と低い馬 (0) を用意
     strategy = ChaserStrategy()
     # 第5引数に acceleration=50 を追加
-    high_exp_horse = Horse("キレ者", 60, 2000, 100, 50, strategy, setup_data)
-    low_exp_horse = Horse("ジリ脚", 60, 2000, 0, 50, strategy, setup_data)
+    # 第6引数に 50 を追加
+    high_exp_horse = Horse("キレ者", 60, 2000, 100, 50, 50, strategy, setup_data)
+    low_exp_horse = Horse("ジリ脚", 60, 2000, 0, 50, 50, strategy, setup_data)
     
     # どちらもスパート状態に固定
     high_exp_horse.is_spurting = True
