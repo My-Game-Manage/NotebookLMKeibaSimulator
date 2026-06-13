@@ -11,15 +11,17 @@ from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .models import Horse
+    from .models import Horse, Corner
 
 class SimulationEngine:
-    def __init__(self, course_length: int, horses: List[Horse], tick_time: float):
+    def __init__(self, course_length: int, horses: List[Horse], tick_time: float,
+                 corners: list[Corner] = None):
         self.course_length = course_length
         self.horses = horses
         self.tick_time = tick_time
+        self.corners = corners or [] # RaceConfigから渡されるコーナーリスト
         self.elapsed_time = 0.0
-        self.rankings: List[Horse] = []  # ゴールした順に馬を格納する [1, 2]
+        self.rankings: List[Horse] = []
 
     def step(self) -> None:
         """1ステップ（tick_time）分のシミュレーションを実行"""
@@ -31,10 +33,27 @@ class SimulationEngine:
         
         for i, horse in enumerate(sorted_horses):
             # 速度計算（strategies.py の決定論的ロジックを呼び出し）
-            # 1. 戦略クラスから「現在の状態での目標速度」を取得
+
+            # --- 2. 目標速度の算出とコーナー制限 ---
+            # 戦略による目標速度を取得
             target_speed = horse.strategy.calculate_step(horse, horse.jockey, self.course_length)
 
-            # 2. 加速力による速度更新（決定論的）
+            # 現在地がコーナー内か判定
+            current_corner = next(
+                (c for c in self.corners if c.start_pos <= horse.position <= c.end_pos), 
+                None
+            )
+
+            corner_stamina_load = 0.0
+            if current_corner:
+                # 遠心力に基づく速度制限： V = 2.0 * sqrt(R) [会話履歴]
+                corner_limit = 2.0 * (current_corner.radius ** 0.5)
+                target_speed = min(target_speed, corner_limit)
+                
+                # コーナー走行によるスタミナ追加負荷 (v^2 / R*10) [会話履歴]
+                corner_stamina_load = (horse.current_speed ** 2) / (current_corner.radius * 10.0)
+
+            # --- 3. 加速力(acceleration)による現在速度の更新 [5, 会話履歴] ---
             # acceleration 0-100 を 加速度 0.5〜1.5 m/s^2 程度にマッピング
             accel_val = 0.5 + (horse.acceleration / 100.0)
 
@@ -47,11 +66,11 @@ class SimulationEngine:
                 # 減速（スタミナ切れ等）：目標速度まで減速
                 horse.current_speed += max(speed_diff, -accel_val * self.tick_time)
 
-            # 3. 更新された現在速度で移動
+            # 更新された現在速度で移動
             distance = horse.current_speed * self.tick_time
             horse.position += distance
 
-            # --- 2. ドラフティング（スリップストリーム）判定 ---
+            # --- 4. ドラフティング判定 [13, 会話履歴] ---
             drafting_multiplier = 1.0
             if i > 0:  # 自分が先頭ではない場合のみ判定
                 front_horse = sorted_horses[i - 1]
@@ -60,30 +79,25 @@ class SimulationEngine:
                 if 0 < gap <= 5.0:
                     drafting_multiplier = 0.9  # スタミナ消費を10%軽減
 
-            # --- 3. 決定論的なスタミナ消費計算 ---
+            # --- 5. スタミナ消費計算（決定論的） [1, 9, 会話履歴] ---
             # 騎手スキルの平均による効率化（1.0が基準）
             skill_average = (horse.jockey.front_skill + horse.jockey.back_skill) / 2.0
             jockey_efficiency = 1.1 - (skill_average * 0.1) 
             
             # 消費量 = 移動距離 * 基準係数 * 騎手効率 * ドラフティング補正
-            consumption = distance * 0.7 * jockey_efficiency * drafting_multiplier
+            # 消費 = (基本消費 + コーナー負荷) * 騎手効率 * ドラフティング * スパート補正
+            base_consumption = (distance * 0.7) + corner_stamina_load
+            spurt_multiplier = 1.3 if horse.is_spurting else 1.0
+            
+            consumption = base_consumption * jockey_efficiency * drafting_multiplier * spurt_multiplier
 
-            if horse.is_spurting:
-                consumption *= 1.3  # スパート中は1.5倍スタミナを消費する　→ スパート時の追加負荷を少し軽減（1.5 -> 1.3）
-            if horse.current_stamina > 0:
-                horse.current_stamina -= consumption
-                if horse.current_stamina < 0:
-                    horse.current_stamina = 0.0
+            horse.current_stamina -= consumption
 
             # ゴール判定
             if horse.position >= self.course_length:
                 horse.position = float(self.course_length)
                 if horse not in self.rankings:
                     self.rankings.append(horse)
-
-        # 同時にゴールした場合は、より遠くまで到達していた馬（ハナ差）を優先して順位付け
-        #newly_finished.sort(key=lambda h: h.position, reverse=True)
-        #self.rankings.extend(newly_finished)
 
     def is_all_finished(self) -> bool:
         """全馬がゴールしたかを確認"""
